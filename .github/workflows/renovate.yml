@@ -10,9 +10,6 @@ on:
         options:
           - info
           - debug
-  pull_request:
-    branches:
-      - main
   schedule:
     - cron: '3 * * * *'
 jobs:
