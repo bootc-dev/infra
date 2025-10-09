@@ -68,10 +68,12 @@
         "Disable Fedora OCI updates"
       ],
       "matchManagers": [
-        "dockerfile"
+        "dockerfile",
+        "github-actions"
       ],
       "matchDepNames": [
-        "quay.io/fedora/fedora"
+        "quay.io/fedora/fedora",
+        "quay.io/fedora/fedora-bootc"
       ],
       "enabled": false
     }
