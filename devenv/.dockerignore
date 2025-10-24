@@ -1,0 +1,8 @@
+# Exclude everything by default, then include just what we need
+# Especially note this means that .git is not included, and not tests/
+# to avoid spurious rebuilds.
+*
+# And explicit includes
+!packages.txt
+!build-deps.txt
+!devenv-init.sh

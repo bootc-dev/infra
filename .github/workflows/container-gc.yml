@@ -1,0 +1,49 @@
+name: Container Image Garbage Collection
+
+on:
+  workflow_dispatch:
+    inputs:
+      retention-days:
+        description: "Delete container images older than this many days"
+        required: false
+        default: "14"
+        type: string
+      dry-run:
+        description: "Dry run mode - don't actually delete anything"
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+env:
+  ORG: ${{ github.repository_owner }}
+  RETENTION_DAYS: ${{ github.event.inputs.retention-days || '14' }}
+  DRY_RUN: ${{ github.event.inputs.dry-run || 'false' }}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      
+      - name: Run container garbage collection
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cargo xtask container-gc --retention-days ${{ env.RETENTION_DAYS }} --dry-run ${{ env.DRY_RUN }} --org ${{ env.ORG }}
+

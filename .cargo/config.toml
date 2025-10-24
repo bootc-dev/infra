@@ -1,0 +1,4 @@
+# Alias for cargo xtask
+[alias]
+xtask = "run --package xtask --"
+

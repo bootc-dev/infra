@@ -6,6 +6,8 @@ This repository provides centralised configuration and automation for the [bootc
 ## Table of Contents
 
 - [Purpose](#purpose)
+- [Development Environment](#development-environment)
+- [Container Image Management](#container-image-management)
 - [Renovate](#renovate)
 - [Getting Started](#getting-started)
 - [Support & Contributions](#support--contributions)
@@ -21,6 +23,70 @@ The main goal of this repository is to:
 - **Simplify onboarding** for new repositories and maintainers.
 - **Enable strict configuration inheritance** for consistency, with flexibility for overrides.
 - **Group and manage dependencies and automation** for easier review and maintenance.
+
+---
+
+## Development Environment
+
+Containerized development environment with necessary tools and dependencies.
+
+```bash
+just devenv-build              # Build locally
+just devenv-build-tagged       # Build with proper tags
+just devenv-push               # Build and push to registry
+```
+
+Images are tagged with `:latest` (main branch only), `:branch-shortsha`, and `:branch-longsha` for traceability.
+
+---
+
+## Container Garbage Collection
+
+Automated cleanup of old container images from GitHub Container Registry. Written in Rust using the xtask pattern.
+
+```bash
+just container-gc-dry-run      # Preview deletions
+just container-gc              # Delete images older than 14 days
+just container-gc-custom 30    # Custom retention period
+```
+
+Or with full options:
+```bash
+cargo xtask container-gc --retention-days 30 --org bootc-dev --dry-run false
+```
+
+Runs automatically every Sunday at 2 AM UTC. Can be triggered manually:
+```bash
+gh workflow run container-gc.yml -f retention-days=30 -f dry-run=true
+```
+
+See `crates/xtask/` for implementation details.
+
+---
+
+## Development
+
+### Building
+
+```bash
+cargo build --release
+```
+
+### Testing
+
+```bash
+cargo test
+cargo clippy --all-targets -- -D warnings
+cargo fmt --all -- --check
+```
+
+### CI
+
+Continuous integration runs on all PRs and pushes to main, validating:
+- Code formatting with rustfmt
+- Linting with clippy
+- Build in release mode
+- All tests pass
 
 ---
 

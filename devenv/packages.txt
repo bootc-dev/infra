@@ -1,0 +1,25 @@
+# Key dependencies
+just
+podman
+curl
+git
+# Just because lots of things expect it
+sudo
+
+# General build env, note we install rust through rustup later
+gcc
+clang
+clang-format
+libkrb5-dev pkg-config libvirt-dev libostree-dev
+
+# Runtime virt
+genisoimage qemu-utils qemu-kvm libvirt-daemon-system virtiofsd
+
+# TUI editors on general principle
+vim nano
+
+# dependency of other things like gemini CLI
+npm
+
+# from 3rd party repo
+gh

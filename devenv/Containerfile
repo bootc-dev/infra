@@ -1,0 +1,89 @@
+# These aren't packages, just low-dependency binaries dropped in /usr/local/bin
+# so we can fetch them independently in a separate build.
+ARG base=docker.io/library/debian:sid
+FROM $base as base
+# Life is too short to care about dash
+RUN ln -sfr /bin/bash /bin/sh
+RUN <<EORUN
+set -xeuo pipefail
+
+# Initialize some basic packages
+apt -y update && apt -y install curl time bzip2
+
+# Enable deb-src repositories for build-dep
+sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list.d/debian.sources
+sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources
+
+# Enable gh CLI repository
+mkdir -p -m 755 /etc/apt/keyrings
+curl -fLo /etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg
+chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+mkdir -p -m 755 /etc/apt/sources.list.d
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
+
+# And re-update after we've fetched repos
+apt -y update
+EORUN
+
+FROM base as tools
+ARG gooseversion=v1.11.1
+ARG bcvkversion=v0.5.3
+RUN <<EORUN
+set -xeuo pipefail
+arch=$(arch)
+
+rm -vrf /usr/local/bin/*
+
+# goose for local AI
+target=goose-${arch}-unknown-linux-gnu.tar.bz2
+/bin/time -f '%E %C' curl -fLO https://github.com/block/goose/releases/download/$gooseversion/$target
+tar xvjf $target
+mv goose /usr/local/bin/goose
+
+# bcvk
+if test "${arch}" = x86_64; then
+  td=$(mktemp -d)
+  cd $td
+  target=bcvk-${arch}-unknown-linux-gnu
+  /bin/time -f '%E %C' curl -fLO https://github.com/bootc-dev/bcvk/releases/download/$bcvkversion/${target}.tar.gz
+  tar xvzf $target.tar.gz
+  mv $target /usr/local/bin/bcvk
+  cd -
+  rm -rf $td
+else
+  echo bcvk unavailable for $arch
+fi
+EORUN
+
+# This builds the image.
+# Build this using `just devenv-build` from the root of the repository.
+FROM base
+COPY packages.txt build-deps.txt /run/src/
+WORKDIR /run/src
+RUN <<EORUN
+set -xeuo pipefail
+grep -vEe '^#' packages.txt | /bin/time -f '%E %C' xargs apt -y install
+grep -vEe '^#' build-deps.txt | /bin/time -f '%E %C' xargs apt -y build-dep
+apt clean && rm -rf /var/lib/apt/lists/*
+EORUN
+
+# Setup for codespaces
+COPY devenv-init.sh /usr/local/bin
+
+# Setup rust via rustup. TODO also split this to a separate stage
+# Set Rust environment variables globally
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN <<EORUN
+set -xeuo pipefail
+# Install Rust system-wide in /usr/local
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default
+# Add cargo to PATH for all users
+echo 'export PATH="/usr/local/cargo/bin:$PATH"' > /etc/profile.d/rust.sh
+chmod +x /etc/profile.d/rust.sh
+ln -s /usr/local/cargo/bin/* /usr/local/bin/ 2>/dev/null || true
+EORUN
+# Copy in the binaries from our tools container image
+COPY --from=tools /usr/local/bin/* /usr/local/bin/
+WORKDIR /
