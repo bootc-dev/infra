@@ -1,5 +1,6 @@
 # This config mainly overrides `summary: false` by default
 # as it's really noisy.
+# Test change to verify patch-based sync works
 have_fun: true
 code_review:
   disable: false
