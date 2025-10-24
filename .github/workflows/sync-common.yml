@@ -1,6 +1,11 @@
 name: Sync common files
 on:
   workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode - only sync to ci-sandbox'
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -45,11 +50,18 @@ jobs:
             });
 
             // Filter out archived repos and this repo itself
-            const activeRepos = repos.filter(repo =>
+            let activeRepos = repos.filter(repo =>
               !repo.archived &&
               repo.name !== context.repo.repo &&
               !repo.name.startsWith('.')
             );
+
+            // Test mode - only sync to ci-sandbox
+            const testMode = '${{ github.event.inputs.test_mode }}' === 'true';
+            if (testMode) {
+              console.log('Test mode enabled - only syncing to ci-sandbox');
+              activeRepos = activeRepos.filter(repo => repo.name === 'ci-sandbox');
+            }
 
             const matrix = activeRepos.map(repo => ({
               repo: repo.name,
@@ -58,12 +70,6 @@ jobs:
 
             console.log('Discovered repositories:', matrix);
             core.setOutput('matrix', JSON.stringify(matrix));
-
-      - name: Upload common files
-        uses: actions/upload-artifact@v4
-        with:
-          name: common-files
-          path: common/
 
   sync:
     name: Sync to ${{ matrix.repo }}
@@ -84,6 +90,11 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repo }}
 
+      - name: Checkout infra repository
+        uses: actions/checkout@v5
+        with:
+          path: infra
+
       - name: Checkout target repository
         uses: actions/checkout@v5
         with:
@@ -91,23 +102,43 @@ jobs:
           token: ${{ steps.token.outputs.token }}
           path: repo
 
-      - name: Download common files
-        uses: actions/download-artifact@v4
-        with:
-          name: common-files
-          path: common-files
-
       - name: Sync common files to repository
         run: |
-          # First pass: copy all files
-          rsync -rlv common-files/ repo/
+          cd infra
+          CURRENT_COMMIT="${{ github.sha }}"
 
-          # Second pass: for each subdirectory in common-files, use --delete
-          # to remove files that no longer exist in the source
-          find common-files -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
-            subdir="${dir#common-files/}"
-            rsync -rlv --delete "common-files/$subdir/" "repo/$subdir/"
-          done
+          # Get the last synced commit from target repo
+          if [ -f "../repo/.bootc-dev-infra-commit.txt" ]; then
+            PREVIOUS_COMMIT=$(cat ../repo/.bootc-dev-infra-commit.txt)
+            echo "Previous sync: $PREVIOUS_COMMIT"
+            echo "Current commit: $CURRENT_COMMIT"
+
+            # Generate patch for changes to common/ directory
+            # Strip the 'common/' prefix so patch applies to repo root
+            git diff "$PREVIOUS_COMMIT" "$CURRENT_COMMIT" -- common/ | \
+              sed 's|a/common/|a/|g; s|b/common/|b/|g' > ../changes.patch
+
+            # Apply the patch to target repo only if there are changes
+            if [ -s ../changes.patch ]; then
+              echo "Applying patch:"
+              cat ../changes.patch
+              cd ../repo
+              patch -p1 < ../changes.patch
+
+              # Update the commit marker only when we applied changes
+              echo "$CURRENT_COMMIT" > .bootc-dev-infra-commit.txt
+            else
+              echo "No changes in common/ directory, skipping"
+            fi
+          else
+            # First sync - copy everything
+            echo "First sync - copying all files"
+            cd ../repo
+            rsync -av ../infra/common/ .
+
+            # Update the commit marker
+            echo "$CURRENT_COMMIT" > .bootc-dev-infra-commit.txt
+          fi
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v7
