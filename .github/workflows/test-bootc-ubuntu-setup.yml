@@ -1,0 +1,30 @@
+name: Test Bootc Ubuntu Setup
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'common/.github/actions/bootc-ubuntu-setup/**'
+      - '.github/workflows/test-bootc-ubuntu-setup.yml'
+
+jobs:
+  test-basic-setup:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run bootc-ubuntu-setup
+        uses: ./common/.github/actions/bootc-ubuntu-setup
+
+  test-libvirt-setup:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run bootc-ubuntu-setup with libvirt
+        uses: ./common/.github/actions/bootc-ubuntu-setup
+        with:
+          libvirt: 'true'
