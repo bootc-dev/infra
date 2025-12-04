@@ -82,6 +82,17 @@
         "quay.io/fedora/fedora-bootc"
       ],
       "enabled": false
+    },
+    // Ignore bootc cargo dependencies to fix failing Renovate task
+    // See: https://github.com/bootc-dev/infra/actions/runs/19914695687
+    {
+      "matchManagers": ["cargo"],
+      "matchPackageNames": [
+        "composefs",
+        "composefs-boot",
+        "composefs-oci"
+      ],
+      "enabled": false
     }
   ]
 }
