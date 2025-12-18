@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Validate Renovate config
-        uses: renovatebot/github-action@v43.0.10
+        uses: renovatebot/github-action@v44.2.0
         env:
           RENOVATE_DRY_RUN: lookup
           LOG_LEVEL: debug
@@ -44,10 +44,10 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Self-hosted Renovate
-        uses: renovatebot/github-action@v43.0.10
+        uses: renovatebot/github-action@v44.2.0
         env:
           RENOVATE_DRY_RUN: ${{ github.repository_owner != 'bootc-dev' && 'full' }}
           LOG_LEVEL: ${{ github.event.inputs.log-level || 'info' }}
