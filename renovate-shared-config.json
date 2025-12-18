@@ -31,6 +31,23 @@
     }
   ],
   "packageRules": [
+    {
+    // These files in these repos are synced from the bootc-dev/infra repository, which
+    // sends PRs to update them. Ignoring them here to avoid conflicting Renovate updates.
+      "matchRepositories": [
+        "bootc-dev/bootc",
+        "bootc-dev/bcvk",
+        "bootc-dev/ci-sandbox",
+        "bootc-dev/containers-image-proxy-rs",
+        "bootc-dev/bootc-dev.github.io"
+      ],
+      "ignorePaths": [
+        ".github/workflows/rebase.yml",
+        ".github/workflows/openssf-scorecard.yml",
+        ".github/actions/bootc-ubuntu-setup/action.yml",
+        ".github/actions/setup-rust/action.yml"
+      ]
+    },
     // Group GitHub Actions dependencies
     {
       "description": ["GitHub Actions dependencies"],
