@@ -34,6 +34,15 @@ looking for any other issues).
 If you are performing a review of other's code, the same
 principles apply.
 
+## Tasks
+
+The [agents/tasks/](agents/tasks/) directory contains reusable task definitions that you
+can execute. These are roughly equivalent to OpenCode "commands" or Claude Code
+"skills".
+
+If the user gives an instruction of the form "run task ..." or similar
+then you should read in agents/tasks/README.md and find the relevant task and continue.
+
 ## Follow other guidelines
 
 Look at the project README.md and look for guidelines
