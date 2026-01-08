@@ -28,6 +28,14 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+ARG \\w+version=(?<currentValue>.+)"
       ]
+    },
+    // Match "# renovate:" comments in .txt files followed by package@version on next line
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["\\.txt$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n.*@(?<currentValue>\\S+)"
+      ]
     }
   ],
   "packageRules": [
@@ -73,7 +81,15 @@
         "dockerfile",
         "custom.regex"
       ],
+      "excludeDatasources": ["npm"],
       "groupName": "Docker",
+      "enabled": true
+    },
+    // Group npm dependencies
+    {
+      "description": ["npm dependencies"],
+      "matchDatasources": ["npm"],
+      "groupName": "npm",
       "enabled": true
     },
     // Disable Containerfile digest pinning
