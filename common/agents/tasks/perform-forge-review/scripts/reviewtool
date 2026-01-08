@@ -1,0 +1,561 @@
+#!/usr/bin/env python3
+"""reviewtool - Manage forge code reviews.
+
+Subcommands:
+    checkout  Check out a PR/MR branch and show diff
+    start     Create a new review file
+    add       Append a comment to a review
+    list      List all review files and their status
+    submit    Submit the review to a forge
+
+Run 'reviewtool <subcommand> --help' for details.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+
+def die(message: str) -> None:
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def detect_forge() -> str:
+    """Detect forge type from git remote or environment."""
+    try:
+        result = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        remote_url = result.stdout.strip()
+    except OSError:
+        remote_url = ""
+
+    if "github.com" in remote_url:
+        return "github"
+    if "gitlab.com" in remote_url or "gitlab." in remote_url:
+        return "gitlab"
+    if os.environ.get("FORGEJO_URL") or os.environ.get("GITEA_URL"):
+        return "forgejo"
+    if os.environ.get("GITLAB_TOKEN") or os.environ.get("PRIVATE_TOKEN"):
+        return "gitlab"
+    return "github"
+
+
+def get_repo_info() -> tuple[str, str]:
+    """Get owner/repo from git remote."""
+    try:
+        result = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        url = result.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        die("Could not determine repository from git remote")
+
+    # Handle various URL formats
+    url = url.rstrip("/")
+    if url.endswith(".git"):
+        url = url[:-4]
+
+    # git@github.com:owner/repo or https://github.com/owner/repo
+    if ":" in url and "@" in url:
+        # SSH format
+        path = url.split(":")[-1]
+    else:
+        # HTTPS format
+        path = "/".join(url.split("/")[-2:])
+
+    parts = path.split("/")
+    if len(parts) < 2:
+        die(f"Could not parse owner/repo from: {url}")
+    return parts[-2], parts[-1]
+
+
+def review_file_for_pr(pr: str) -> Path:
+    return Path(f".git/review-{pr}.jsonl")
+
+
+def build_pr_url(forge: str, owner: str, repo: str, pr: str) -> str:
+    """Build PR/MR URL based on forge type and repository info."""
+    if forge == "github":
+        return f"https://github.com/{owner}/{repo}/pull/{pr}"
+    elif forge == "gitlab":
+        # For GitLab, we might need to handle custom instances
+        gitlab_url = os.environ.get("GITLAB_URL", "https://gitlab.com").rstrip("/")
+        return f"{gitlab_url}/{owner}/{repo}/-/merge_requests/{pr}"
+    elif forge in ("forgejo", "gitea"):
+        # Use the configured instance URL
+        base_url = (os.environ.get("FORGEJO_URL") or os.environ.get("GITEA_URL", "")).rstrip("/")
+        if base_url:
+            return f"{base_url}/{owner}/{repo}/pulls/{pr}"
+        else:
+            return f"<unknown-forgejo>/{owner}/{repo}/pulls/{pr}"
+    else:
+        return f"<unknown-forge>/{owner}/{repo}/pull/{pr}"
+
+
+# =============================================================================
+# checkout subcommand
+# =============================================================================
+
+
+def cmd_checkout(args: argparse.Namespace) -> None:
+    """Check out PR branch and show diff."""
+    pr = args.pr
+    forge = args.forge or detect_forge()
+
+    if forge == "github":
+        subprocess.run(["gh", "pr", "checkout", pr], check=True)
+    elif forge == "gitlab":
+        subprocess.run(["glab", "mr", "checkout", pr], check=True)
+    elif forge in ("forgejo", "gitea"):
+        # Fallback to git fetch
+        subprocess.run(
+            ["git", "fetch", "origin", f"pull/{pr}/head:pr-{pr}"],
+            check=True,
+        )
+        subprocess.run(["git", "checkout", f"pr-{pr}"], check=True)
+    else:
+        die(f"Unknown forge: {forge}")
+
+    # Show the diff
+    result = subprocess.run(
+        ["git", "merge-base", "HEAD", "main"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        merge_base = result.stdout.strip()
+        print(f"\n--- Changes since {merge_base[:8]} ---\n")
+        subprocess.run(["git", "log", "--oneline", f"{merge_base}..HEAD"])
+        print()
+        subprocess.run(["git", "diff", "--stat", f"{merge_base}..HEAD"])
+
+
+# =============================================================================
+# start subcommand
+# =============================================================================
+
+
+def cmd_start(args: argparse.Namespace) -> None:
+    """Create a new review file."""
+    review_file = review_file_for_pr(args.pr)
+
+    if review_file.exists():
+        die(f"Review file exists: {review_file}. Delete it first.")
+
+    review_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with review_file.open("w") as f:
+        json.dump({"body": args.body}, f)
+        f.write("\n")
+
+    print(f"Review started: {review_file}")
+
+
+# =============================================================================
+# add subcommand
+# =============================================================================
+
+
+def cmd_add(args: argparse.Namespace) -> None:
+    """Append a comment to a review."""
+    review_file = review_file_for_pr(args.pr)
+    file_path = Path(args.file)
+
+    if not review_file.exists():
+        die(f"No review file. Run 'reviewtool start --pr {args.pr}' first.")
+
+    if not file_path.exists():
+        die(f"File not found: {file_path}")
+
+    # Validate line content
+    try:
+        with file_path.open() as f:
+            lines = f.readlines()
+    except OSError as e:
+        die(f"Failed to read {file_path}: {e}")
+
+    if args.line < 1 or args.line > len(lines):
+        die(f"Line {args.line} out of range (file has {len(lines)} lines)")
+
+    actual_line = lines[args.line - 1].rstrip("\n\r")
+    if args.match not in actual_line:
+        print(f"Error: Match text not found on line {args.line}", file=sys.stderr)
+        print(f"  Expected: {args.match}", file=sys.stderr)
+        print(f"  Actual:   {actual_line}", file=sys.stderr)
+        sys.exit(1)
+
+    comment = {"path": str(file_path), "line": args.line, "body": args.body}
+    if args.old_path:
+        comment["old_path"] = args.old_path
+
+    with review_file.open("a") as f:
+        json.dump(comment, f)
+        f.write("\n")
+
+    print(f"Added comment: {file_path}:{args.line}")
+
+
+# =============================================================================
+# list subcommand
+# =============================================================================
+
+
+def cmd_list(args: argparse.Namespace) -> None:
+    """List all review files and their status."""
+    git_dir = Path(".git")
+    if not git_dir.exists():
+        die("Not in a git repository")
+    
+    review_files = list(git_dir.glob("review-*.jsonl"))
+    
+    if not review_files:
+        print("No reviews found.")
+        return
+    
+    import datetime
+    
+    # Detect forge type and get repo info
+    forge = detect_forge()
+    try:
+        owner, repo = get_repo_info()
+    except SystemExit:
+        # If we can't get repo info, use placeholders
+        owner, repo = "unknown", "unknown"
+    
+    # Collect review data
+    reviews = []
+    for review_file in sorted(review_files):
+        # Extract PR number from filename
+        pr_match = review_file.stem.split('-', 1)[1] if '-' in review_file.stem else "unknown"
+        
+        try:
+            review = parse_review_file(review_file)
+            comment_count = len(review.comments)
+            
+            # Get file size and modification time
+            stat = review_file.stat()
+            size = stat.st_size
+            mtime = stat.st_mtime
+            
+            # Format modification time
+            mod_time = datetime.datetime.fromtimestamp(mtime).strftime("%m-%d %H:%M")
+            
+            # Build PR URL
+            pr_url = build_pr_url(forge, owner, repo, pr_match)
+            
+            # Show first few lines of review body  
+            body_preview = review.body.replace('\n', ' ')[:35] + "..." if len(review.body) > 35 else review.body.replace('\n', ' ')
+            
+            reviews.append({
+                'pr': pr_match,
+                'comments': comment_count,
+                'size': size,
+                'modified': mod_time,
+                'body': body_preview,
+                'file': str(review_file),
+                'review_obj': review,
+                'url': pr_url
+            })
+            
+        except Exception as e:
+            pr_url = build_pr_url(forge, owner, repo, pr_match)
+            reviews.append({
+                'pr': pr_match,
+                'comments': '?',
+                'size': '?',
+                'modified': '?',
+                'body': f"Error: {str(e)[:25]}...",
+                'file': str(review_file),
+                'review_obj': None,
+                'url': pr_url
+            })
+    
+    # Print header
+    print(f"{'URL':<50} {'Comments':<8} {'Size':<8} {'Modified':<11} Body")
+    print(f"{'---':<50} {'--------':<8} {'----':<8} {'--------':<11} ----")
+    
+    # Print each review
+    for r in reviews:
+        size_str = f"{r['size']}B" if isinstance(r['size'], int) else r['size']
+        print(f"{r['url']:<50} {r['comments']:<8} {size_str:<8} {r['modified']:<11} {r['body']}")
+    
+    # Show detailed comments if verbose
+    if args.verbose:
+        for r in reviews:
+            if r['review_obj'] and len(r['review_obj'].comments) > 0:
+                print(f"\nPR #{r['pr']} comments:")
+                for i, comment in enumerate(r['review_obj'].comments, 1):
+                    file_path = comment.get("path", "unknown")
+                    line = comment.get("line", "?")
+                    body_preview = comment.get("body", "")[:60] + "..." if len(comment.get("body", "")) > 60 else comment.get("body", "")
+                    print(f"  {i}. {file_path}:{line} - {body_preview}")
+                print()
+
+
+# =============================================================================
+# submit subcommand
+# =============================================================================
+
+
+@dataclass
+class ReviewData:
+    body: str
+    comments: list[dict]
+
+
+def parse_review_file(path: Path) -> ReviewData:
+    if not path.exists():
+        die(f"Review file not found: {path}")
+
+    entries = []
+    with path.open() as f:
+        for i, line in enumerate(f, 1):
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError as e:
+                    die(f"Invalid JSON on line {i}: {e}")
+
+    if not entries:
+        die(f"Empty review file: {path}")
+
+    body = entries[0].get("body")
+    if not body:
+        die("First line missing 'body' field")
+
+    return ReviewData(body=body, comments=entries[1:])
+
+
+def submit_github(owner: str, repo: str, pr: str, review: ReviewData) -> None:
+    payload = {"body": review.body, "comments": review.comments}
+
+    result = subprocess.run(
+        ["gh", "api", f"repos/{owner}/{repo}/pulls/{pr}/reviews",
+         "-X", "POST", "--input", "-"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    try:
+        response = json.loads(result.stdout) if result.stdout else {}
+    except json.JSONDecodeError:
+        response = {}
+
+    if response.get("id"):
+        print(f"Review created: {response.get('html_url', response['id'])}")
+    else:
+        die(f"Failed: {result.stdout}{result.stderr}")
+
+
+def submit_gitlab(project_id: str, mr: str, review: ReviewData) -> None:
+    token = os.environ.get("GITLAB_TOKEN") or os.environ.get("PRIVATE_TOKEN")
+    if not token:
+        die("GITLAB_TOKEN environment variable required")
+
+    gitlab_url = os.environ.get("GITLAB_URL", "https://gitlab.com").rstrip("/")
+
+    # Get version info
+    req = urllib.request.Request(
+        f"{gitlab_url}/api/v4/projects/{project_id}/merge_requests/{mr}/versions",
+        headers={"PRIVATE-TOKEN": token},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            versions = json.loads(resp.read())
+    except urllib.error.URLError as e:
+        die(f"Failed to get MR info: {e}")
+
+    if not versions:
+        die("No version info for this MR")
+
+    v = versions[0]
+    base_sha, head_sha, start_sha = (
+        v.get("base_commit_sha"),
+        v.get("head_commit_sha"),
+        v.get("start_commit_sha"),
+    )
+
+    # Post comments as draft notes
+    for c in review.comments:
+        data = urllib.parse.urlencode({
+            "note": c["body"],
+            "position[position_type]": "text",
+            "position[base_sha]": base_sha,
+            "position[head_sha]": head_sha,
+            "position[start_sha]": start_sha,
+            "position[old_path]": c.get("old_path", c["path"]),
+            "position[new_path]": c["path"],
+            "position[new_line]": str(c["line"]),
+        }).encode()
+
+        req = urllib.request.Request(
+            f"{gitlab_url}/api/v4/projects/{project_id}/merge_requests/{mr}/draft_notes",
+            data=data,
+            headers={"PRIVATE-TOKEN": token},
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(req, timeout=30)
+        except urllib.error.URLError as e:
+            die(f"Failed to create note for {c['path']}:{c['line']}: {e}")
+
+    # Post review body
+    data = urllib.parse.urlencode({"body": review.body}).encode()
+    req = urllib.request.Request(
+        f"{gitlab_url}/api/v4/projects/{project_id}/merge_requests/{mr}/notes",
+        data=data,
+        headers={"PRIVATE-TOKEN": token},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=30)
+    except urllib.error.URLError:
+        pass  # Non-fatal
+
+    print("Review created")
+
+
+def submit_forgejo(owner: str, repo: str, pr: str, review: ReviewData) -> None:
+    token = os.environ.get("FORGEJO_TOKEN") or os.environ.get("GITEA_TOKEN")
+    if not token:
+        die("FORGEJO_TOKEN environment variable required")
+
+    base_url = os.environ.get("FORGEJO_URL") or os.environ.get("GITEA_URL")
+    if not base_url:
+        die("FORGEJO_URL environment variable required")
+
+    base_url = base_url.rstrip("/")
+
+    payload = {
+        "body": review.body,
+        "comments": [
+            {"path": c["path"], "new_position": c["line"], "body": c["body"]}
+            for c in review.comments
+        ],
+    }
+
+    req = urllib.request.Request(
+        f"{base_url}/api/v1/repos/{owner}/{repo}/pulls/{pr}/reviews",
+        data=json.dumps(payload).encode(),
+        headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            response = json.loads(resp.read())
+    except urllib.error.URLError as e:
+        die(f"Failed: {e}")
+
+    if response.get("id"):
+        print("Review created")
+    else:
+        die(f"Failed: {response}")
+
+
+def cmd_submit(args: argparse.Namespace) -> None:
+    """Submit review to forge."""
+    review_file = review_file_for_pr(args.pr)
+    review = parse_review_file(review_file)
+    forge = args.forge or detect_forge()
+
+    if args.dry_run:
+        print(f"Review validated: {len(review.comments)} comment(s)")
+        return
+
+    owner, repo = get_repo_info()
+
+    if forge == "github":
+        submit_github(owner, repo, args.pr, review)
+    elif forge == "gitlab":
+        # For GitLab, owner/repo becomes project_id
+        submit_gitlab(urllib.parse.quote(f"{owner}/{repo}", safe=""), args.pr, review)
+    elif forge in ("forgejo", "gitea"):
+        submit_forgejo(owner, repo, args.pr, review)
+    else:
+        die(f"Unknown forge: {forge}")
+
+    review_file.unlink()
+    print(f"Removed {review_file}")
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="reviewtool",
+        description="Manage forge code reviews.",
+    )
+    parser.add_argument(
+        "--forge",
+        choices=["github", "gitlab", "forgejo", "gitea"],
+        help="Forge type (auto-detected if omitted)",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # checkout
+    p = subparsers.add_parser("checkout", help="Check out PR and show diff")
+    p.add_argument("pr", help="PR/MR number")
+    p.set_defaults(func=cmd_checkout)
+
+    # start
+    p = subparsers.add_parser("start", help="Create a new review file")
+    p.add_argument("--pr", required=True, help="PR/MR number")
+    p.add_argument("--body", required=True, help="Review body (include attribution)")
+    p.set_defaults(func=cmd_start)
+
+    # add
+    p = subparsers.add_parser("add", help="Add a comment to review")
+    p.add_argument("--pr", required=True, help="PR/MR number")
+    p.add_argument("--file", required=True, help="File path")
+    p.add_argument("--line", type=int, required=True, help="Line number")
+    p.add_argument("--match", required=True, help="Text on that line (validation)")
+    p.add_argument("--body", required=True, help="Comment body")
+    p.add_argument("--old-path", help="Original path for renames (GitLab)")
+    p.set_defaults(func=cmd_add)
+
+    # list
+    p = subparsers.add_parser("list", help="List all review files and their status")
+    p.add_argument("-v", "--verbose", action="store_true", help="Show detailed comment information")
+    p.set_defaults(func=cmd_list)
+
+    # submit
+    p = subparsers.add_parser("submit", help="Submit review to forge")
+    p.add_argument("--pr", required=True, help="PR/MR number")
+    p.add_argument("--dry-run", action="store_true", help="Validate only")
+    p.set_defaults(func=cmd_submit)
+
+    args = parser.parse_args(argv)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
