@@ -21,6 +21,10 @@
   // where you don't want to burn CI credits, while still keeping your branch
   // in a mergeable state at all times.
   "rebaseWhen": "conflicted",
+  // Custom managers for detecting dependencies in non-standard files
+  //
+  // - Containerfile/Dockerfile: Match "# renovate:" comments with ARG statements
+  // - .txt files: Match "# renovate:" comments followed by package@version on next line
   "customManagers": [
     {
       "customType": "regex",
@@ -29,7 +33,6 @@
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+ARG \\w+version=(?<currentValue>.+)"
       ]
     },
-    // Match "# renovate:" comments in .txt files followed by package@version on next line
     {
       "customType": "regex",
       "managerFilePatterns": ["\\.txt$"],
