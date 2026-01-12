@@ -84,7 +84,6 @@
         "dockerfile",
         "custom.regex"
       ],
-      "excludeDatasources": ["npm"],
       "groupName": "Docker",
       "enabled": true
     },
