@@ -35,7 +35,7 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["\\.txt$"],
+      "managerFilePatterns": ["**/*.txt"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n.*@(?<currentValue>\\S+)"
       ]
