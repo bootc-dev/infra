@@ -9,6 +9,9 @@ sudo
 acl
 rsync
 
+# Sandboxing (used by devaipod and flatpak)
+bubblewrap
+
 # General build env (note: we install rust through rustup later)
 gcc
 clang
