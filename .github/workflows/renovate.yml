@@ -46,7 +46,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Self-hosted Renovate
-        uses: renovatebot/github-action@v44.2.3
+        uses: renovatebot/github-action@v44.2.4
         env:
           RENOVATE_DRY_RUN: ${{ github.repository_owner != 'bootc-dev' && 'full' }}
           LOG_LEVEL: ${{ github.event.inputs.log-level || 'info' }}
