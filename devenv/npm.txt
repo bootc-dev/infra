@@ -1,2 +1,2 @@
 # renovate: datasource=npm depName=opencode-ai
-opencode-ai@1.1.20
+opencode-ai@1.1.21
