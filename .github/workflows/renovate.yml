@@ -20,14 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Validate Renovate config
-        uses: renovatebot/github-action@v44.2.3
-        env:
-          RENOVATE_DRY_RUN: lookup
-          LOG_LEVEL: debug
-        with:
-          configurationFile: renovate-config.js
-          token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Validate Renovate config with schema validator
+        run: |
+          docker run --rm -v $(pwd):/usr/src/app ghcr.io/renovatebot/renovate:42 \
+            renovate-config-validator --strict \
+            /usr/src/app/renovate.json \
+            /usr/src/app/renovate-shared-config.json \
+            /usr/src/app/renovate-config.js
 
   renovate:
     runs-on: ubuntu-latest
