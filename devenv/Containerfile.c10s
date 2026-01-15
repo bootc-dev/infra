@@ -30,6 +30,8 @@ FROM base as tools
 ARG gooseversion=v1.11.1
 # renovate: datasource=github-releases depName=bootc-dev/bcvk
 ARG bcvkversion=v0.9.0
+# renovate: datasource=github-releases depName=ossf/scorecard
+ARG scorecardversion=v5.1.1
 RUN <<EORUN
 set -xeuo pipefail
 arch=$(arch)
@@ -58,6 +60,23 @@ if test "${arch}" = x86_64; then
 else
   echo bcvk unavailable for $arch
 fi
+
+# scorecard (OpenSSF security scanner)
+td=$(mktemp -d)
+(
+  cd $td
+  # Map arch to scorecard naming convention
+  case "${arch}" in
+    x86_64) scarch=amd64 ;;
+    aarch64) scarch=arm64 ;;
+    *) echo "scorecard unavailable for $arch"; exit 0 ;;
+  esac
+  target=scorecard_${scorecardversion#v}_linux_${scarch}.tar.gz
+  /bin/time -f '%E %C' curl -fLO https://github.com/ossf/scorecard/releases/download/$scorecardversion/$target
+  tar xvzf $target
+  mv scorecard /usr/local/bin/scorecard
+)
+rm -rf $td
 EORUN
 
 FROM base as rust

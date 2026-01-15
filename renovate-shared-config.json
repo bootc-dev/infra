@@ -39,6 +39,14 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n.*@(?<currentValue>\\S+)"
       ]
+    },
+    // Shell scripts in GHA workflows/actions: Match "# renovate:" followed by VERSION=
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["**/*.yml", "**/*.yaml"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n\\s*VERSION=(?<currentValue>v?\\S+)"
+      ]
     }
   ],
   "packageRules": [
