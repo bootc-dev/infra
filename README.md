@@ -7,8 +7,13 @@ This repository provides centralized configuration and automation for the
 
 - **[Development Environment](devenv/README.md)** - Containerized dev environment with
   necessary tools
-- **[Renovate](#renovate)** - Centralized dependency update management
-- **Container Garbage Collection** - Automated cleanup of old images from GHCR
+- **Scheduled Global Actions** - Automation that runs across the organization:
+  - [Renovate](#renovate) - Centralized dependency update management
+  - Container Garbage Collection - Automated cleanup of old images from GHCR
+
+## Documentation
+
+- [New Repository Setup](docs/SOP-new-repository.md) - Steps for onboarding new repos
 
 ## Renovate
 
