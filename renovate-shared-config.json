@@ -42,6 +42,24 @@
     }
   ],
   "packageRules": [
+    // Default: Wait 1 week before proposing updates to ensure stability
+    //
+    // This prevents chasing every patch release and reduces PR noise from
+    // rapidly-updating dependencies (e.g., opencode-ai had 7 updates in 8 days).
+    {
+      "description": ["Wait 1 week before proposing updates to ensure stability"],
+      "matchPackageNames": ["/.*/"],
+      "minimumReleaseAge": "7 days"
+    },
+    // Exceptions: Pick up certain packages immediately
+    //
+    // Add rules here for packages that should bypass the default waiting period,
+    // such as our own projects or critical dependencies.
+    {
+      "description": ["Pick up bcvk packages immediately without waiting"],
+      "matchPackageNames": ["/^bcvk$/"],
+      "minimumReleaseAge": "0 days"
+    },
     {
     // These files in these repos are synced from the bootc-dev/infra repository, which
     // sends PRs to update them. Ignoring them here to avoid conflicting Renovate updates.
