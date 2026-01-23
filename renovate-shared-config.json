@@ -47,6 +47,21 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n\\s*VERSION=(?<currentValue>v?\\S+)"
       ]
+    },
+    // Git refs (commit SHA) tracking in Justfiles and YAML workflows
+    // Justfile example:
+    //   # renovate: datasource=git-refs depName=https://github.com/org/repo branch=main
+    //   export VAR := env("VAR", "0000000000000000000000000000000000000000")
+    // YAML example:
+    //   # renovate: datasource=git-refs depName=https://github.com/org/repo branch=main
+    //   VAR: '0000000000000000000000000000000000000000'
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["**/Justfile", "**/*.just", "**/*.yml", "**/*.yaml"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>git-refs) depName=(?<depName>[^\\s]+) branch=(?<currentValue>[^\\s]+)\\n[^\\n]*\"(?<currentDigest>[a-f0-9]{40})\"",
+        "# renovate: datasource=(?<datasource>git-refs) depName=(?<depName>[^\\s]+) branch=(?<currentValue>[^\\s]+)\\n[^\\n]*'(?<currentDigest>[a-f0-9]{40})'"
+      ]
     }
   ],
   "packageRules": [
