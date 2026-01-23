@@ -12,6 +12,9 @@ rsync
 # Sandboxing (used by devaipod and flatpak)
 bubblewrap
 
+# Terminal multiplexer (used by devaipod tmux command)
+tmux
+
 # General build env (note: we install rust through rustup later)
 gcc
 clang
