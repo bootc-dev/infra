@@ -15,12 +15,6 @@
   // referenced in Cargo.toml files. Without initializing submodules, Renovate
   // will fail to analyze these dependencies.
   "cloneSubmodules": true,
-  // Rebase when there are merge conflicts
-  //
-  // The "conflicted" option is typically the ideal choice for most situations
-  // where you don't want to burn CI credits, while still keeping your branch
-  // in a mergeable state at all times.
-  "rebaseWhen": "conflicted",
   // Custom managers for detecting dependencies in non-standard files
   //
   // - Containerfile/Dockerfile: Match "# renovate:" comments with ARG statements
