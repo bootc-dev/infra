@@ -12,3 +12,6 @@
 !build-deps-debian.txt
 !build-deps-c10s.txt
 !devenv-init.sh
+!fetch-tools.sh
+!install-rust.sh
+!install-kani.sh

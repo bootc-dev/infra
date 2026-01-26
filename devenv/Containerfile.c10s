@@ -30,59 +30,20 @@ FROM base as tools
 ARG bcvkversion=v0.9.0
 # renovate: datasource=github-releases depName=ossf/scorecard
 ARG scorecardversion=v5.1.1
-RUN <<EORUN
-set -xeuo pipefail
-arch=$(arch)
-
-rm -vrf /usr/local/bin/*
-
-# bcvk
-if test "${arch}" = x86_64; then
-  td=$(mktemp -d)
-  (
-    cd $td
-    target=bcvk-${arch}-unknown-linux-gnu
-    /bin/time -f '%E %C' curl -fLO https://github.com/bootc-dev/bcvk/releases/download/$bcvkversion/${target}.tar.gz
-    tar xvzf $target.tar.gz
-    mv $target /usr/local/bin/bcvk
-  )
-  rm -rf $td
-else
-  echo bcvk unavailable for $arch
-fi
-
-# scorecard (OpenSSF security scanner)
-td=$(mktemp -d)
-(
-  cd $td
-  # Map arch to scorecard naming convention
-  case "${arch}" in
-    x86_64) scarch=amd64 ;;
-    aarch64) scarch=arm64 ;;
-    *) echo "scorecard unavailable for $arch"; exit 0 ;;
-  esac
-  target=scorecard_${scorecardversion#v}_linux_${scarch}.tar.gz
-  /bin/time -f '%E %C' curl -fLO https://github.com/ossf/scorecard/releases/download/$scorecardversion/$target
-  tar xvzf $target
-  mv scorecard /usr/local/bin/scorecard
-)
-rm -rf $td
-EORUN
+COPY fetch-tools.sh /run/src/
+RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion /run/src/fetch-tools.sh
 
 FROM base as rust
-RUN <<EORUN
-set -xeuo pipefail
-# Setup rust; the idea here though is we install system-wide into /usr/local
-# as if it was packaged.
-export RUSTUP_HOME=/usr/local/rustup
-export CARGO_HOME=/usr/local/cargo
-# Install Rust system-wide
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default
-# Move binaries to /usr/local/bin (system-managed, root-owned)
-mv /usr/local/cargo/bin/* /usr/local/bin/
-# Nothing really left here
-rm -vrf /usr/local/cargo/bin
-EORUN
+COPY install-rust.sh /run/src/
+RUN /run/src/install-rust.sh
+
+# Kani formal verification tool - requires rustup for toolchain management
+FROM rust as kani
+# renovate: datasource=crate depName=kani-verifier
+ARG kaniversion=0.67.0
+RUN dnf install -y gcc && dnf clean all
+COPY install-kani.sh /run/src/
+RUN kaniversion=$kaniversion /run/src/install-kani.sh
 
 # This builds the image.
 # Build this using `just devenv-build-c10s` from the root of the repository.
@@ -100,10 +61,14 @@ RUN grep -vEe '^#' npm.txt | /bin/time -f '%E %C' xargs npm i -g
 
 # Copy in the binaries from our tools container image
 COPY --from=tools /usr/local/bin/* /usr/local/bin/
-COPY --from=rust /usr/local/bin/* /usr/local/bin/
-COPY --from=rust /usr/local/rustup /usr/local/rustup
+COPY --from=kani /usr/local/bin/* /usr/local/bin/
+COPY --from=kani /usr/local/rustup /usr/local/rustup
+# Kani bundle (compiler, libraries, CBMC) installed via KANI_HOME during setup
+COPY --from=kani /usr/local/kani /usr/local/kani
 # Point rustup at the system-wide installation, but let CARGO_HOME default to ~/.cargo
 ENV RUSTUP_HOME=/usr/local/rustup
+# Point Kani at the system-wide installation
+ENV KANI_HOME=/usr/local/kani
 # Setup for codespaces
 COPY devenv-init.sh /usr/local/bin/
 
