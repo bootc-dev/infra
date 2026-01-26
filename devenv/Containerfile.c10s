@@ -26,8 +26,6 @@ dnf -y makecache
 EORUN
 
 FROM base as tools
-# renovate: datasource=github-releases depName=block/goose
-ARG gooseversion=v1.11.1
 # renovate: datasource=github-releases depName=bootc-dev/bcvk
 ARG bcvkversion=v0.9.0
 # renovate: datasource=github-releases depName=ossf/scorecard
@@ -37,14 +35,6 @@ set -xeuo pipefail
 arch=$(arch)
 
 rm -vrf /usr/local/bin/*
-
-# goose is a single static binary
-target=goose-${arch}-unknown-linux-gnu.tar.bz2
-/bin/time -f '%E %C' curl -fLO https://github.com/block/goose/releases/download/$gooseversion/$target
-tar xvjf $target
-mv goose /usr/local/bin/goose
-
-## Other tools
 
 # bcvk
 if test "${arch}" = x86_64; then
