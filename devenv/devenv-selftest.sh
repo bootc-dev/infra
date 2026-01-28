@@ -1,12 +1,10 @@
 #!/bin/bash
 # Test that nested podman and VMs work correctly in this devcontainer.
-# This script is designed to be run inside the container after devenv-init.sh.
+# This script is designed to be run inside the container after devenv-init.sh
+# has already been executed (e.g., via postCreateCommand).
 set -euo pipefail
 
 echo "=== Testing nested podman and VMs ==="
-
-echo "Running devenv-init.sh..."
-sudo /usr/local/bin/devenv-init.sh
 
 echo "Podman version:"
 podman --version

@@ -13,9 +13,25 @@ devenv-build-c10s:
 # Build devenv image with local tag (defaults to Debian)
 devenv-build: devenv-build-debian
 
-# Test nested podman and VMs work in a devcontainer image
-# Usage: just devcontainer-test <image>
-# Example: just devcontainer-test ghcr.io/bootc-dev/devenv-debian:latest
-# Note: Uses --privileged because Docker doesn't support podman's unmask=/proc/* option
-devcontainer-test image:
-	docker run --rm --privileged "{{ image }}" /usr/libexec/devenv-selftest.sh
+# Test devcontainer with a locally built image
+# Usage: just devcontainer-test <os>
+# Example: just devcontainer-test debian
+devcontainer-test os:
+	#!/bin/bash
+	set -euo pipefail
+	cat > /tmp/devcontainer-override.json << 'EOF'
+	{
+	  "image": "localhost/bootc-devenv-{{os}}:latest",
+	  "runArgs": [
+	    "--security-opt", "label=disable",
+	    "--security-opt", "unmask=/proc/*",
+	    "--device", "/dev/net/tun",
+	    "--device", "/dev/kvm"
+	  ],
+	  "postCreateCommand": {
+	    "devenv-init": "sudo /usr/local/bin/devenv-init.sh"
+	  }
+	}
+	EOF
+	npx --yes @devcontainers/cli up --workspace-folder . --docker-path podman --override-config /tmp/devcontainer-override.json --remove-existing-container
+	npx @devcontainers/cli exec --workspace-folder . --docker-path podman /usr/libexec/devenv-selftest.sh
