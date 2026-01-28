@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""
+Set up nested podman inside privileged docker/podman containers (codespaces, devpod).
+
+This handles:
+- Mount propagation fixes
+- /dev/kvm permissions
+- subuid/subgid configuration for constrained UID namespaces
+- containers.conf configuration for nested operation
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+def run_cmd(cmd: list[str], check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
+    """Run a command, optionally capturing output."""
+    return subprocess.run(cmd, check=check, capture_output=capture, text=True)
+
+
+def get_mount_propagation(target: str) -> str:
+    """Get mount propagation type for a given mount point."""
+    result = run_cmd(["findmnt", "-J", "-o", "TARGET,PROPAGATION", target], capture=True, check=False)
+    if result.returncode != 0:
+        return "unknown"
+    try:
+        data = json.loads(result.stdout)
+        return data.get("filesystems", [{}])[0].get("propagation", "unknown")
+    except (json.JSONDecodeError, IndexError, KeyError):
+        return "unknown"
+
+
+def fix_mount_propagation() -> None:
+    """Fix root mount propagation if needed (e.g., in codespaces)."""
+    propagation = get_mount_propagation("/")
+    if propagation == "private":
+        result = run_cmd(["mount", "-o", "remount", "--make-shared", "/"], check=False)
+        if result.returncode == 0:
+            print("Set / to shared propagation")
+        else:
+            print("Warning: Could not set / to shared propagation (may not be needed)")
+
+
+def fix_kvm_permissions() -> None:
+    """Make /dev/kvm accessible to all users (safe, like Fedora derivatives do)."""
+    kvm = Path("/dev/kvm")
+    if kvm.exists():
+        try:
+            kvm.chmod(0o666)
+        except PermissionError:
+            pass
+
+
+def detect_constrained_namespace() -> tuple[bool, int]:
+    """
+    Detect whether we're in a constrained UID namespace.
+
+    Returns:
+        (is_constrained, max_uid): True if constrained (1000-100000 UIDs available),
+                                   along with the maximum usable UID.
+    """
+    max_uid = 0
+    try:
+        with open("/proc/self/uid_map") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 3:
+                    inside = int(parts[0])
+                    count = int(parts[2])
+                    end = inside + count
+                    if end > max_uid:
+                        max_uid = end
+    except (OSError, ValueError):
+        return False, 0
+
+    # Constrained if between 1000 and 100000 UIDs
+    is_constrained = 1000 < max_uid < 100000
+    return is_constrained, max_uid
+
+
+def configure_subuid_subgid(target_user: str | None = None) -> None:
+    """
+    Configure subuid/subgid for nested rootless podman in constrained UID namespaces.
+
+    Args:
+        target_user: Username to configure. Defaults to SUDO_USER or current user.
+    """
+    # Only proceed if podman is available
+    if not shutil.which("podman"):
+        return
+
+    # Check for newuidmap/newgidmap
+    if not shutil.which("newuidmap"):
+        print("Warning: newuidmap not found, nested podman may fail")
+
+    is_constrained, max_uid = detect_constrained_namespace()
+    if not is_constrained:
+        print(f"Full UID namespace available (max={max_uid}), using default podman config")
+        return
+
+    # Determine target user
+    if target_user is None:
+        target_user = os.environ.get("SUDO_USER")
+    if target_user is None:
+        import pwd
+        target_user = pwd.getpwuid(os.getuid()).pw_name
+
+    # Get target user's UID
+    import pwd
+    try:
+        target_uid = pwd.getpwnam(target_user).pw_uid
+    except KeyError:
+        print(f"Warning: User {target_user} not found")
+        return
+
+    # Calculate subuid range
+    subuid_start = target_uid + 1
+    subuid_count = max_uid - subuid_start
+
+    if subuid_count < 1000:
+        print(f"Insufficient UID range for nested podman (only {subuid_count} UIDs available)")
+        return
+
+    expected = f"{target_user}:{subuid_start}:{subuid_count}"
+
+    # Check if already configured correctly
+    subuid_path = Path("/etc/subuid")
+    if subuid_path.exists():
+        current = None
+        for line in subuid_path.read_text().splitlines():
+            if line.startswith(f"{target_user}:"):
+                current = line
+                break
+        if current == expected:
+            print(f"Nested podman subuid/subgid already configured for {target_user}")
+            return
+
+    print(f"Configuring nested podman for {target_user} (subuid {subuid_start}:{subuid_count})")
+
+    # Configure subuid/subgid
+    for path in [Path("/etc/subuid"), Path("/etc/subgid")]:
+        lines = []
+        if path.exists():
+            lines = [line for line in path.read_text().splitlines()
+                     if not line.startswith(f"{target_user}:")]
+        lines.append(expected)
+        path.write_text("\n".join(lines) + "\n")
+
+    # Reset podman storage if it exists (may have wrong UID mappings)
+    import pwd
+    user_home = Path(pwd.getpwnam(target_user).pw_dir)
+    storage_dir = user_home / ".local/share/containers/storage"
+    if storage_dir.exists():
+        print("Resetting podman storage for new UID mappings")
+        shutil.rmtree(storage_dir)
+
+    print("Nested podman subuid/subgid configured successfully")
+
+
+def configure_containers_conf() -> None:
+    """Configure containers.conf for nested container operation."""
+    if not shutil.which("podman"):
+        return
+
+    is_constrained, _ = detect_constrained_namespace()
+
+    if not is_constrained:
+        # Full namespace - just update the shipped config
+        conf_path = Path("/usr/share/containers/containers.conf")
+        if conf_path.exists():
+            content = conf_path.read_text()
+            content = content.replace("#cgroups =", 'cgroups = "no-conmon"  #')
+            content = content.replace("#cgroup_manager =", 'cgroup_manager = "cgroupfs"  #')
+            conf_path.write_text(content)
+    else:
+        # Constrained namespace - create full config for nested operation
+        conf_dir = Path("/etc/containers")
+        conf_dir.mkdir(parents=True, exist_ok=True)
+        conf_path = conf_dir / "containers.conf"
+        conf_path.write_text("""\
+# Generated for nested container support in constrained UID namespace
+[containers]
+cgroups = "disabled"
+utsns = "host"
+
+[engine]
+cgroup_manager = "cgroupfs"
+""")
+        print("Configured containers.conf for constrained UID namespace")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Configure nested podman for devcontainers"
+    )
+    parser.add_argument(
+        "user",
+        nargs="?",
+        help="Target user for subuid/subgid configuration (default: SUDO_USER or current user)",
+    )
+    args = parser.parse_args()
+
+    fix_mount_propagation()
+    fix_kvm_permissions()
+    configure_subuid_subgid(args.user)
+    configure_containers_conf()
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
