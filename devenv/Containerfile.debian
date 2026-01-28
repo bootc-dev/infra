@@ -71,6 +71,9 @@ ENV RUSTUP_HOME=/usr/local/rustup
 ENV KANI_HOME=/usr/local/kani
 # Setup for codespaces
 COPY devenv-init.sh /usr/local/bin/
+COPY userns-setup /usr/lib/devenv/userns-setup
+COPY devenv-selftest.sh /usr/libexec/
+RUN chmod 755 /usr/libexec/devenv-selftest.sh /usr/lib/devenv/userns-setup
 
 WORKDIR /
 # Create user before declaring volumes so home directory has correct ownership

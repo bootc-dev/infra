@@ -55,6 +55,10 @@ set -xeuo pipefail
 grep -hEve '^#' packages-common.txt packages-c10s.txt | /bin/time -f '%E %C' xargs dnf -y install
 grep -vEe '^#' build-deps-c10s.txt | /bin/time -f '%E %C' xargs dnf -y builddep
 dnf clean all
+# Restore file capabilities for newuidmap/newgidmap - these are defined in the
+# shadow-utils RPM but get stripped during container image builds.
+# Required for nested rootless podman.
+rpm --setcaps shadow-utils
 EORUN
 COPY npm.txt /run/src
 RUN grep -vEe '^#' npm.txt | /bin/time -f '%E %C' xargs npm i -g
@@ -71,6 +75,9 @@ ENV RUSTUP_HOME=/usr/local/rustup
 ENV KANI_HOME=/usr/local/kani
 # Setup for codespaces
 COPY devenv-init.sh /usr/local/bin/
+COPY userns-setup /usr/lib/devenv/userns-setup
+COPY devenv-selftest.sh /usr/libexec/
+RUN chmod 755 /usr/libexec/devenv-selftest.sh /usr/lib/devenv/userns-setup
 
 WORKDIR /
 # Create user before declaring volumes so home directory has correct ownership
@@ -81,6 +88,9 @@ useradd -m devenv -s /bin/bash
 mkdir -p ~devenv/.local/share/containers
 chown -R -h devenv: ~devenv/.local
 echo 'devenv ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/devenv && chmod 0440 /etc/sudoers.d/devenv
+# Make /etc/shadow readable by root group, required for PAM to work with
+# sudo in containers using --userns=keep-id (matches Debian behavior)
+chmod 040 /etc/shadow
 EORUN
 # To avoid overlay-on-overlay with nested containers
 VOLUME [ "/var/lib/containers", "/home/devenv/.local/share/containers/" ]

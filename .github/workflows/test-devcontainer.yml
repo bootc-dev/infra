@@ -1,0 +1,38 @@
+name: Test DevContainer
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'devenv/**'
+      - 'common/.devcontainer/**'
+      - '.github/workflows/test-devcontainer.yml'
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [debian, c10s]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up runner
+        uses: bootc-dev/actions/bootc-ubuntu-setup@main
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test nested podman in devcontainer
+        run: just devcontainer-test ${{ env.REGISTRY }}/${{ github.repository_owner }}/devenv-${{ matrix.os }}:latest
