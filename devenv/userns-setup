@@ -7,6 +7,9 @@ This handles:
 - /dev/kvm permissions
 - subuid/subgid configuration for constrained UID namespaces
 - containers.conf configuration for nested operation
+
+Reference: quay.io/podman/stable image configuration
+  https://github.com/containers/image_build/tree/main/podman
 """
 
 import argparse
@@ -169,28 +172,31 @@ def configure_containers_conf() -> None:
 
     is_constrained, _ = detect_constrained_namespace()
 
+    conf_dir = Path("/etc/containers")
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    conf_path = conf_dir / "containers.conf"
+
     if not is_constrained:
-        # Full namespace - just update the shipped config
-        conf_path = Path("/usr/share/containers/containers.conf")
-        if conf_path.exists():
-            content = conf_path.read_text()
-            content = content.replace("#cgroups =", 'cgroups = "no-conmon"  #')
-            content = content.replace("#cgroup_manager =", 'cgroup_manager = "cgroupfs"  #')
-            conf_path.write_text(content)
+        header = "# Generated for nested container support"
+        container_settings = 'cgroups = "no-conmon"'
     else:
-        # Constrained namespace - create full config for nested operation
-        conf_dir = Path("/etc/containers")
-        conf_dir.mkdir(parents=True, exist_ok=True)
-        conf_path = conf_dir / "containers.conf"
-        conf_path.write_text("""\
-# Generated for nested container support in constrained UID namespace
+        header = "# Generated for nested container support in constrained UID namespace"
+        container_settings = 'cgroups = "disabled"\nutsns = "host"'
+
+    conf_path.write_text(f"""\
+{header}
+# Reference: https://github.com/containers/image_build/tree/main/podman
 [containers]
-cgroups = "disabled"
-utsns = "host"
+# Disable default sysctls - /proc/sys is read-only in nested containers
+# (specifically net.ipv4.ping_group_range causes "Read-only file system" errors)
+# See: https://github.com/containers/common/blob/main/pkg/config/containers.conf
+default_sysctls = []
+{container_settings}
 
 [engine]
 cgroup_manager = "cgroupfs"
 """)
+    if is_constrained:
         print("Configured containers.conf for constrained UID namespace")
 
 
