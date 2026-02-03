@@ -4,8 +4,16 @@ This container image is suitable for use on
 developing projects in the bootc-dev organization,
 especially bootc.
 
-It includes all tools used in the Justfile
-for relevant projects.
+The goal is to make this completely usable as a devcontainer
+with tools such as VSCode remote containers, Codespaces,
+[devpod](https://devpod.sh/) and others.
+
+Specifically this includes e.g.:
+
+- Rust and C/C++ toolchains
+- `nu`
+- [tmt](https://tmt.readthedocs.io/)
+- [Kani](https://model-checking.github.io/kani/usage.html) for system verification
 
 ## Base image
 
