@@ -39,5 +39,68 @@ else
     echo "=== Skipping bcvk VM test (bcvk not available or /dev/kvm missing) ==="
 fi
 
+# Test new tools added to devenv
+echo ""
+echo "=== Testing additional devenv tools ==="
+
+# Test nushell - should be available on all images
+echo "Testing nushell..."
+if ! command -v nu >/dev/null 2>&1; then
+    echo "Error: nushell (nu) command not found" >&2
+    exit 1
+fi
+echo "nushell version:"
+nu --version
+echo "nushell basic functionality test:"
+echo 'print "Hello from nushell!"' | nu
+echo "=== nushell test passed ==="
+
+# Test tmt - available on both systems but installed differently
+echo "Testing tmt..."
+if ! command -v tmt >/dev/null 2>&1; then
+    echo "Error: tmt command not found" >&2
+    exit 1
+fi
+echo "tmt version:"
+tmt --version
+echo "tmt basic functionality test:"
+# Create a minimal test directory with a working tmt setup
+tmpdir=$(mktemp -d)
+(
+    cd "$tmpdir"
+    # Create basic fmf metadata directory and file
+    mkdir -p .fmf
+    echo "1" > .fmf/version
+    
+    # Create a minimal test
+    mkdir -p tests
+    cat > tests/basic.fmf <<EOF
+summary: Basic validation test
+test: echo "tmt test validation passed"
+duration: 5s
+EOF
+    
+    # Create a minimal plan
+    mkdir -p plans
+    cat > plans/basic.fmf <<EOF
+summary: Basic validation plan
+discover:
+    how: fmf
+execute:
+    how: local
+EOF
+    
+    # Test tmt functionality
+    echo "Testing tmt plan discovery..."
+    tmt plan ls
+    echo "Testing tmt test discovery..."
+    tmt test ls
+    echo "Basic tmt validation complete"
+)
+rm -rf "$tmpdir"
+echo "=== tmt test passed ==="
+
+
+
 echo ""
 echo "=== All tests passed ==="

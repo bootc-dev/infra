@@ -12,5 +12,8 @@ xorriso
 qemu-img
 libvirt-daemon-kvm
 
+# Testing framework
+tmt
+
 # TUI editors
 vim-enhanced

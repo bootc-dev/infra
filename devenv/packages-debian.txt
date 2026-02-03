@@ -12,5 +12,8 @@ genisoimage
 qemu-utils
 libvirt-daemon-system
 
+# Python package management
+python3-pip
+
 # TUI editors
 vim
