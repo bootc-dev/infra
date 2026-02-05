@@ -59,23 +59,18 @@
     }
   ],
   "packageRules": [
-    // Default: Wait 1 week before proposing updates to ensure stability
+    // Limit dependency updates to once per week to reduce PR churn
     //
-    // This prevents chasing every patch release and reduces PR noise from
-    // rapidly-updating dependencies (e.g., opencode-ai had 7 updates in 8 days).
-    {
-      "description": ["Wait 1 week before proposing updates to ensure stability"],
-      "matchPackageNames": ["/.*/"],
-      "minimumReleaseAge": "7 days"
-    },
-    // Exceptions: Pick up certain packages immediately
+    // Rapidly-updating dependencies (e.g., opencode-ai) can create excessive PRs.
+    // By scheduling updates to Sundays only, we get one PR per week with the
+    // latest version, skipping all intermediate releases.
     //
-    // Add rules here for packages that should bypass the default waiting period,
-    // such as our own projects or critical dependencies.
+    // Exception: bcvk updates immediately (excluded via negated regex).
     {
-      "description": ["Pick up bcvk packages immediately without waiting"],
-      "matchPackageNames": ["/^bcvk$/"],
-      "minimumReleaseAge": "0 days"
+      "description": ["Limit dependency updates to weekly (Sundays UTC) to reduce PR churn. bcvk is excluded and updates immediately."],
+      "matchPackageNames": ["!/^bcvk$/"],
+      "schedule": ["on sunday"],
+      "timezone": "UTC"
     },
     {
     // These files in these repos are synced from the bootc-dev/infra repository, which
