@@ -30,8 +30,10 @@ FROM base as tools
 ARG bcvkversion=v0.9.0
 # renovate: datasource=github-releases depName=ossf/scorecard
 ARG scorecardversion=v5.1.1
+# renovate: datasource=github-releases depName=nushell/nushell
+ARG nushellversion=0.110.0
 COPY fetch-tools.sh /run/src/
-RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion /run/src/fetch-tools.sh
+RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion nushellversion=$nushellversion /run/src/fetch-tools.sh
 
 FROM base as rust
 COPY install-rust.sh /run/src/
