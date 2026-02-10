@@ -7,6 +7,9 @@ libkrb5-dev
 libvirt-dev
 libostree-dev
 
+# Python dev headers (needed for uv to build libvirt-python from source for tmt)
+python3-dev
+
 # Runtime virt
 genisoimage
 qemu-utils
