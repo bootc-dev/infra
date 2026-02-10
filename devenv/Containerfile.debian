@@ -7,6 +7,9 @@ RUN ln -sfr /bin/bash /bin/sh
 RUN <<EORUN
 set -xeuo pipefail
 
+# Disable apt sandboxing for nested container environments
+echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/99sandbox-disable
+
 # Initialize some basic packages
 apt -y update && apt -y install curl time bzip2
 
