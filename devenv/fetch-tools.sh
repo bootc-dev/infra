@@ -6,6 +6,7 @@ set -xeuo pipefail
 # Required environment variables (passed as build ARGs)
 : "${bcvkversion:?bcvkversion is required}"
 : "${scorecardversion:?scorecardversion is required}"
+: "${nushellversion:?nushellversion is required}"
 
 arch=$(arch)
 
@@ -40,5 +41,24 @@ td=$(mktemp -d)
   /bin/time -f '%E %C' curl -fLO https://github.com/ossf/scorecard/releases/download/$scorecardversion/$target
   tar xvzf $target
   mv scorecard /usr/local/bin/scorecard
+)
+rm -rf $td
+
+# nushell - modern shell
+td=$(mktemp -d)
+(
+  cd $td
+  # Map arch to nushell naming convention
+  case "${arch}" in
+    x86_64) nuarch=x86_64 ;;
+    aarch64) nuarch=aarch64 ;;
+    *) echo "nushell unavailable for $arch"; return 0 ;;
+  esac
+  target=nu-${nushellversion}-${nuarch}-unknown-linux-gnu.tar.gz
+  /bin/time -f '%E %C' curl -fLO https://github.com/nushell/nushell/releases/download/$nushellversion/$target
+  tar xvzf $target
+  # The extracted directory has the same name as the archive without .tar.gz
+  extracted_dir=nu-${nushellversion}-${nuarch}-unknown-linux-gnu
+  mv $extracted_dir/nu /usr/local/bin/nu
 )
 rm -rf $td

@@ -7,6 +7,9 @@ RUN ln -sfr /bin/bash /bin/sh
 RUN <<EORUN
 set -xeuo pipefail
 
+# Disable apt sandboxing for nested container environments
+echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/99sandbox-disable
+
 # Initialize some basic packages
 apt -y update && apt -y install curl time bzip2
 
@@ -30,8 +33,13 @@ FROM base as tools
 ARG bcvkversion=v0.9.0
 # renovate: datasource=github-releases depName=ossf/scorecard
 ARG scorecardversion=v5.1.1
-COPY fetch-tools.sh /run/src/
-RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion /run/src/fetch-tools.sh
+# renovate: datasource=github-releases depName=nushell/nushell
+ARG nushellversion=0.110.0
+# renovate: datasource=github-releases depName=astral-sh/uv
+ARG uvversion=0.10.2
+COPY fetch-tools.sh install-uv.sh /run/src/
+RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion nushellversion=$nushellversion /run/src/fetch-tools.sh
+RUN uvversion=$uvversion /run/src/install-uv.sh
 
 FROM base as rust
 COPY install-rust.sh /run/src/
@@ -58,6 +66,14 @@ apt clean && rm -rf /var/lib/apt/lists/*
 EORUN
 COPY npm.txt /run/src
 RUN grep -vEe '^#' npm.txt | /bin/time -f '%E %C' xargs npm i -g
+
+# Install tmt via uv tool install for isolated environment
+# UV_TOOL_DIR and UV_TOOL_BIN_DIR set to system-wide locations like rustup
+COPY --from=tools /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=tools /usr/local/bin/uvx /usr/local/bin/uvx
+ENV UV_TOOL_DIR=/usr/local/uv-tools
+ENV UV_TOOL_BIN_DIR=/usr/local/bin
+RUN uv tool install 'tmt[provision-virtual]'
 
 # Copy in the binaries from our tools container image
 COPY --from=tools /usr/local/bin/* /usr/local/bin/
