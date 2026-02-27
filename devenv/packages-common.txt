@@ -9,6 +9,9 @@ sudo
 acl
 rsync
 
+# Container image tools (bootc/composefs testing)
+skopeo
+
 # Sandboxing (used by devaipod and flatpak)
 bubblewrap
 
