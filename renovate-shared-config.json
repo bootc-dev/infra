@@ -22,7 +22,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["(^|/)Containerfile$", "(^|/)Dockerfile$"],
+      "managerFilePatterns": ["/(^|/)Containerfile(\\.[^/]*)?$/", "/(^|/)Dockerfile(\\.[^/]*)?$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+ARG \\w+version=(?<currentValue>.+)"
       ]
@@ -34,12 +34,13 @@
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n.*@(?<currentValue>\\S+)"
       ]
     },
-    // Shell scripts in GHA workflows/actions: Match "# renovate:" followed by VERSION=
+    // Shell scripts in GHA workflows/actions: Match "# renovate:" followed by
+    // VERSION= or "export FOO_VERSION=" patterns
     {
       "customType": "regex",
       "managerFilePatterns": ["**/*.yml", "**/*.yaml"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n\\s*VERSION=(?<currentValue>v?\\S+)"
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n\\s*(?:export )?\\w*VERSION=(?<currentValue>v?\\S+)"
       ]
     },
     // Git refs (commit SHA) tracking in Justfiles and YAML workflows
@@ -68,7 +69,7 @@
     // Exception: bcvk updates immediately (excluded via negated regex).
     {
       "description": ["Limit dependency updates to weekly (Sundays UTC) to reduce PR churn. bcvk is excluded and updates immediately."],
-      "matchPackageNames": ["!/^bcvk$/"],
+      "matchPackageNames": ["!bootc-dev/bcvk"],
       "schedule": ["on sunday"],
       "timezone": "UTC"
     },
