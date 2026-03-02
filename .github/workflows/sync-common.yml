@@ -35,7 +35,7 @@ jobs:
         run: cargo build --release --manifest-path scripts/sync-common/Cargo.toml
 
       - name: Upload sync-common binary
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: sync-common
           path: scripts/sync-common/target/release/sync-common
@@ -125,7 +125,7 @@ jobs:
           path: repo
 
       - name: Download sync-common binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: sync-common
           path: .
