@@ -65,6 +65,14 @@ dnf clean all
 # Required for nested rootless podman.
 rpm --setcaps shadow-utils
 EORUN
+# fsverity-utils is not yet in CentOS Stream 10 repos; install from Koji
+# https://koji.fedoraproject.org/koji/buildinfo?buildID=2949299
+RUN kojipkgs=https://kojipkgs.fedoraproject.org/packages/fsverity-utils/1.7/1.el10_3/$(arch) && \
+    dnf -y install \
+      ${kojipkgs}/fsverity-utils-1.7-1.el10_3.$(arch).rpm \
+      ${kojipkgs}/libfsverity-1.7-1.el10_3.$(arch).rpm && \
+    dnf clean all
+
 COPY npm.txt /run/src
 RUN grep -vEe '^#' npm.txt | /bin/time -f '%E %C' xargs npm i -g
 

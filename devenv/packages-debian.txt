@@ -15,5 +15,8 @@ genisoimage
 qemu-utils
 libvirt-daemon-system
 
+# Filesystem verity utilities (composefs testing)
+fsverity
+
 # TUI editors
 vim

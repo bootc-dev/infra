@@ -9,6 +9,9 @@ sudo
 acl
 rsync
 
+# Container image tools (bootc/composefs testing)
+skopeo
+
 # Sandboxing (used by devaipod and flatpak)
 bubblewrap
 
@@ -18,6 +21,7 @@ tmux
 # General build env (note: we install rust through rustup later)
 gcc
 clang
+golang
 pkg-config
 go-md2man
 
