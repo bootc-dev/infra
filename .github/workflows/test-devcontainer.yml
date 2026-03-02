@@ -8,6 +8,7 @@ on:
       - 'devenv/**'
       - 'common/.devcontainer/**'
       - '.github/workflows/test-devcontainer.yml'
+      - 'Justfile'
 
 env:
   REGISTRY: ghcr.io
@@ -33,34 +34,5 @@ jobs:
       - name: Build devcontainer image
         run: just devenv-build-${{ matrix.os }}
 
-      - name: Create override config for local image
-        run: |
-          cat > /tmp/devcontainer-override.json << 'EOF'
-          {
-            "image": "localhost/bootc-devenv-${{ matrix.os }}:latest",
-            "runArgs": [
-              "--security-opt", "label=disable",
-              "--security-opt", "unmask=/proc/*",
-              "--device", "/dev/net/tun",
-              "--device", "/dev/kvm"
-            ],
-            "postCreateCommand": {
-              "devenv-init": "sudo /usr/local/bin/devenv-init.sh"
-            }
-          }
-          EOF
-
-      - name: Start devcontainer
-        run: |
-          npx --yes @devcontainers/cli up \
-            --workspace-folder . \
-            --docker-path podman \
-            --override-config /tmp/devcontainer-override.json \
-            --remove-existing-container
-
-      - name: Test nested podman in devcontainer
-        run: |
-          npx @devcontainers/cli exec \
-            --workspace-folder . \
-            --docker-path podman \
-            /usr/libexec/devenv-selftest.sh
+      - name: Test devcontainer
+        run: just devcontainer-test ${{ matrix.os }}

@@ -19,19 +19,17 @@ devenv-build: devenv-build-debian
 devcontainer-test os:
 	#!/bin/bash
 	set -euo pipefail
-	cat > /tmp/devcontainer-override.json << 'EOF'
-	{
-	  "image": "localhost/bootc-devenv-{{os}}:latest",
-	  "runArgs": [
-	    "--security-opt", "label=disable",
-	    "--security-opt", "unmask=/proc/*",
-	    "--device", "/dev/net/tun",
-	    "--device", "/dev/kvm"
-	  ],
-	  "postCreateCommand": {
-	    "devenv-init": "sudo /usr/local/bin/devenv-init.sh"
-	  }
-	}
-	EOF
-	npx --yes @devcontainers/cli up --workspace-folder . --docker-path podman --override-config /tmp/devcontainer-override.json --remove-existing-container
-	npx @devcontainers/cli exec --workspace-folder . --docker-path podman /usr/libexec/devenv-selftest.sh
+	# Tag local image to match what devcontainer.json expects
+	# (devcontainer CLI's --override-config replaces rather than merges, so we
+	# work around by tagging the image to the expected name)
+	podman tag localhost/bootc-devenv-{{os}}:latest ghcr.io/bootc-dev/devenv-{{os}}:latest
+	npx --yes @devcontainers/cli up \
+	  --workspace-folder . \
+	  --docker-path podman \
+	  --config common/.devcontainer/devcontainer.json \
+	  --remove-existing-container
+	npx @devcontainers/cli exec \
+	  --workspace-folder . \
+	  --docker-path podman \
+	  --config common/.devcontainer/devcontainer.json \
+	  /usr/libexec/devenv-selftest.sh
