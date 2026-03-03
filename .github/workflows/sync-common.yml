@@ -55,45 +55,70 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
+      - name: Generate Actions Token (composefs)
+        id: token-composefs
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: composefs
+
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Get repository list
         id: get-repos
         uses: actions/github-script@v8
+        env:
+          COMPOSEFS_TOKEN: ${{ steps.token-composefs.outputs.token }}
         with:
           github-token: ${{ steps.token.outputs.token }}
           script: |
-            const repos = await github.paginate(github.rest.repos.listForOrg, {
-              org: context.repo.owner,
-              type: 'all',
-              per_page: 100
-            });
+            const composefsGithub = require('@actions/github').getOctokit(process.env.COMPOSEFS_TOKEN);
 
-            // Filter out archived repos and this repo itself
-            let activeRepos = repos.filter(repo =>
-              !repo.archived &&
-              repo.name !== context.repo.repo &&
-              !repo.name.startsWith('.')
-            );
+            const orgs = [
+              { name: context.repo.owner, octokit: github },
+              { name: 'composefs', octokit: composefsGithub },
+            ];
+
+            let allRepos = [];
+            for (const org of orgs) {
+              const repos = await org.octokit.paginate(org.octokit.rest.repos.listForOrg, {
+                org: org.name,
+                type: 'all',
+                per_page: 100
+              });
+
+              // Filter out archived repos, this repo itself (for home org), and dot-prefixed repos
+              const activeRepos = repos.filter(repo =>
+                !repo.archived &&
+                !(org.name === context.repo.owner && repo.name === context.repo.repo) &&
+                !repo.name.startsWith('.')
+              );
+
+              for (const repo of activeRepos) {
+                allRepos.push({
+                  repo: repo.name,
+                  full_name: repo.full_name,
+                  owner: org.name
+                });
+              }
+            }
 
             // Test mode - only sync to ci-sandbox
             const testMode = '${{ github.event.inputs.test_mode }}' === 'true';
             if (testMode) {
               console.log('Test mode enabled - only syncing to ci-sandbox');
-              activeRepos = activeRepos.filter(repo => repo.name === 'ci-sandbox');
+              allRepos = allRepos.filter(repo =>
+                repo.owner === context.repo.owner && repo.name === 'ci-sandbox'
+              );
             }
 
-            const matrix = activeRepos.map(repo => ({
-              repo: repo.name,
-              full_name: repo.full_name
-            }));
-
-            console.log('Discovered repositories:', matrix);
-            core.setOutput('matrix', JSON.stringify(matrix));
+            console.log('Discovered repositories:', allRepos);
+            core.setOutput('matrix', JSON.stringify(allRepos));
 
   sync:
-    name: Sync to ${{ matrix.repo }}
+    name: Sync to ${{ matrix.full_name }}
     needs: [build, init]
     if: needs.init.outputs.matrix != '[]'
     runs-on: ubuntu-latest
@@ -108,7 +133,7 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          owner: ${{ matrix.owner }}
           repositories: ${{ matrix.repo }}
 
       - name: Checkout infra repository
