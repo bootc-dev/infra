@@ -39,8 +39,10 @@ RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion nushellversion=$
 RUN uvversion=$uvversion /run/src/install-uv.sh
 
 FROM base as rust
+# renovate: datasource=custom.rust-nightly depName=rust-nightly versioning=rust-release-channel
+ARG rust_nightly=nightly-2026-03-02
 COPY install-rust.sh /run/src/
-RUN /run/src/install-rust.sh
+RUN rust_nightly=$rust_nightly /run/src/install-rust.sh
 
 # Kani formal verification tool - requires rustup for toolchain management
 FROM rust as kani
