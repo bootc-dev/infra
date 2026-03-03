@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Rust
-        uses: ./common/.github/actions/setup-rust
+        uses: bootc-dev/actions/setup-rust@main
 
       - name: Build sync-common
         run: cargo build --release --manifest-path scripts/sync-common/Cargo.toml
