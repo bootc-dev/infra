@@ -11,10 +11,13 @@ module.exports = {
   // Centralise all Renovate configuration into this repository
   //
   // This allows for easier management of Renovate settings across multiple
-  // repositories.  Each individual repository can still contain their own
-  // configuration.
+  // repositories and organisations. Each individual repository can still
+  // contain their own configuration.
+  //
+  // Note: this uses an explicit repo name rather than {{parentOrg}}/infra
+  // so that repos in other orgs (e.g. composefs) also inherit from here.
   inheritConfig: true,
-  inheritConfigRepoName: '{{parentOrg}}/infra',
+  inheritConfigRepoName: 'bootc-dev/infra',
   inheritConfigFileName: "renovate-shared-config.json",
   inheritConfigStrict: true,
 

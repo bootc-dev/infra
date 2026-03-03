@@ -32,6 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: validate
     if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - owner: bootc-dev
+          - owner: composefs
     steps:
       - name: Generate Actions Token
         id: token
@@ -40,7 +46,7 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          owner: ${{ matrix.owner }}
 
       - name: Checkout
         uses: actions/checkout@v6

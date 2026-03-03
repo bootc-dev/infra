@@ -81,7 +81,9 @@
         "bootc-dev/bcvk",
         "bootc-dev/ci-sandbox",
         "bootc-dev/containers-image-proxy-rs",
-        "bootc-dev/bootc-dev.github.io"
+        "bootc-dev/bootc-dev.github.io",
+        "composefs/composefs",
+        "composefs/composefs-rs"
       ],
       "ignorePaths": [
         ".github/workflows/rebase.yml",
