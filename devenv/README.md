@@ -1,58 +1,33 @@
-# A devcontainer for work on bootc-org projects
+# A devcontainer for work on bootc-dev projects
 
-This container image is suitable for use on
-developing projects in the bootc-dev organization,
-especially bootc.
+This is an image designed for the [devcontainer ecosystem](https://containers.dev/)
+along with targeting the development of projects in this bootc-dev
+organization, especially bootc.
 
-The goal is to make this completely usable as a devcontainer
-with tools such as VSCode remote containers, Codespaces,
-[devpod](https://devpod.sh/) and others.
+## Components
 
-Specifically this includes e.g.:
-
-- Rust and C/C++ toolchains
+- Rust, Go and C/C++ toolchains
+- podman (for nested containers, see below)
 - `nu`
-- [tmt](https://tmt.readthedocs.io/)
-- [Kani](https://model-checking.github.io/kani/usage.html) for system verification
+- [bcvk](https://github.com/bootc-dev/bcvk/) to launch bootc VMs
+- [tmt](https://tmt.readthedocs.io/) since bootc testing requires it
+- [Kani](https://model-checking.github.io/kani/usage.html)
 
-## Base image
+## Base images
 
-At the current time the default is using Debian sid, mainly because
-other parts of the upstream use CentOS Stream as a *target system*
-base, but this helps prove out the general case of "src != target"
-that is a philosophy of bootc (and containers in general)
-as well as just helping prepare/motivate for bootc-on-Debian.
+There are two images:
+
+- [ghcr.io/bootc-dev/devenv-debian](https://github.com/orgs/bootc-dev/packages/container/package/devenv-debian) which uses Debian sid as a base
+- [ghcr.io/bootc-dev/devenv-c10s](https://github.com/orgs/bootc-dev/packages/container/package/devenv-c10s) which uses CentOS Stream 10 as a base
 
 ## Nested container support
 
 This image supports running `podman` and `podman build` inside the container
-(podman-in-podman). The `userns-setup` script configures the environment at
-container startup.
+(podman-in-podman). The [userns-setup](userns-setup) script configures the environment at
+container startup, handling both constrained (Codespaces, rootless) and full UID namespaces.
 
-### Reference: quay.io/podman/stable
-
-Our nested container configuration is based on the official
-[quay.io/podman/stable](https://github.com/containers/image_build/tree/main/podman)
-image. Key differences:
-
-| Feature | quay.io/podman/stable | bootc-devenv |
-|---------|----------------------|--------------|
-| **default_sysctls** | `[]` | `[]` |
-| **cgroups** | `"disabled"` | `"disabled"` (constrained) / `"no-conmon"` (full) |
-| **cgroup_manager** | `"cgroupfs"` | `"cgroupfs"` |
-| **netns/userns/ipcns/utsns/cgroupns** | `"host"` for all | `utsns = "host"` (constrained only) |
-| **BUILDAH_ISOLATION** | `chroot` (env var) | Not set (uses OCI default) |
-| **subuid/subgid** | Hardcoded for `podman` user | Dynamically calculated based on available UID range |
-| **storage** | Modified storage.conf for fuse-overlayfs | VOLUME mounts avoid overlay-on-overlay |
-
-### Constrained vs full UID namespace
-
-The `userns-setup` script detects whether we're running in a constrained UID
-namespace (typical for rootless podman, GitHub Codespaces, etc.) and adjusts:
-
-- **Full namespace** (>100k UIDs): Uses default subuid/subgid, `cgroups = "no-conmon"`
-- **Constrained namespace** (<100k UIDs): Dynamically calculates subuid/subgid
-  ranges, uses `cgroups = "disabled"` and `utsns = "host"`
+Note that in order to enable this you will also need to pair it with
+a [devcontainer JSON](../common/.devcontainer/devcontainer.json).
 
 ## Building locally
 
