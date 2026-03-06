@@ -24,7 +24,7 @@ jobs:
     name: Discover repositories
     runs-on: ubuntu-24.04
     outputs:
-      matrix: ${{ steps.get-repos.outputs.matrix }}
+      matrix: ${{ steps.discover.outputs.matrix }}
       labels: ${{ steps.parse-labels.outputs.labels }}
     steps:
       - name: Checkout
@@ -51,8 +51,8 @@ jobs:
               sys.exit(1)
           '
 
-      - name: Generate Actions Token
-        id: token
+      - name: Generate Actions Token (bootc-dev)
+        id: token-bootc
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
@@ -67,55 +67,13 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           owner: composefs
 
-      - name: Get repository list
-        id: get-repos
-        uses: actions/github-script@v8
-        env:
-          COMPOSEFS_TOKEN: ${{ steps.token-composefs.outputs.token }}
+      - name: Discover repositories
+        id: discover
+        uses: bootc-dev/actions/discover-repos@main
         with:
-          github-token: ${{ steps.token.outputs.token }}
-          script: |
-            const composefsGithub = require('@actions/github').getOctokit(process.env.COMPOSEFS_TOKEN);
-
-            const orgs = [
-              { name: context.repo.owner, octokit: github },
-              { name: 'composefs', octokit: composefsGithub },
-            ];
-
-            let allRepos = [];
-            for (const org of orgs) {
-              const repos = await org.octokit.paginate(org.octokit.rest.repos.listForOrg, {
-                org: org.name,
-                type: 'all',
-                per_page: 100
-              });
-
-              // Filter out archived repos and dot-prefixed repos
-              const activeRepos = repos.filter(repo =>
-                !repo.archived &&
-                !repo.name.startsWith('.')
-              );
-
-              for (const repo of activeRepos) {
-                allRepos.push({
-                  repo: repo.name,
-                  full_name: repo.full_name,
-                  owner: org.name
-                });
-              }
-            }
-
-            // Test mode - only sync to ci-sandbox
-            const testMode = '${{ github.event.inputs.test_mode }}' === 'true';
-            if (testMode) {
-              console.log('Test mode enabled - only syncing to ci-sandbox');
-              allRepos = allRepos.filter(repo =>
-                repo.owner === context.repo.owner && repo.name === 'ci-sandbox'
-              );
-            }
-
-            console.log('Discovered repositories:', allRepos);
-            core.setOutput('matrix', JSON.stringify(allRepos));
+          orgs: '["${{ github.repository_owner }}", "composefs"]'
+          tokens: '{"${{ github.repository_owner }}": "${{ steps.token-bootc.outputs.token }}", "composefs": "${{ steps.token-composefs.outputs.token }}"}'
+          test-mode: ${{ github.event.inputs.test_mode || 'false' }}
 
   sync:
     name: Sync to ${{ matrix.full_name }}
