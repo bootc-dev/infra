@@ -180,6 +180,7 @@
       "matchManagers": ["cargo"],
       "matchPackageNames": [
         "composefs",
+        "cfsctl",
         "composefs-boot",
         "composefs-oci"
       ],
