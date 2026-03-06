@@ -27,7 +27,7 @@ EORUN
 
 FROM base as tools
 # renovate: datasource=github-releases depName=bootc-dev/bcvk
-ARG bcvkversion=v0.9.0
+ARG bcvkversion=v0.11.0
 # renovate: datasource=github-releases depName=ossf/scorecard
 ARG scorecardversion=v5.1.1
 # renovate: datasource=github-releases depName=nushell/nushell
