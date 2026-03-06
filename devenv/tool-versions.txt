@@ -1,0 +1,12 @@
+# Tool versions for fetch-tools.py
+# Format: name@version (one per line)
+# Renovate annotations allow automated version updates.
+
+# renovate: datasource=github-releases depName=bootc-dev/bcvk
+bcvk@v0.11.0
+# renovate: datasource=github-releases depName=ossf/scorecard
+scorecard@v5.1.1
+# renovate: datasource=github-releases depName=nushell/nushell
+nushell@0.110.0
+# renovate: datasource=github-releases depName=jj-vcs/jj
+jj@0.39.0

@@ -12,7 +12,8 @@
 !build-deps-debian.txt
 !build-deps-c10s.txt
 !devenv-init.sh
-!fetch-tools.sh
+!fetch-tools.py
+!tool-versions.txt
 !install-rust.sh
 !install-uv.sh
 !install-kani.sh
