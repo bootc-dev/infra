@@ -9,6 +9,7 @@ organization, especially bootc.
 - Rust, Go and C/C++ toolchains
 - podman (for nested containers, see below)
 - `nu`
+- [jj (Jujutsu)](https://github.com/jj-vcs/jj) as a Git-compatible VCS frontend
 - [bcvk](https://github.com/bootc-dev/bcvk/) to launch bootc VMs
 - [tmt](https://tmt.readthedocs.io/) since bootc testing requires it
 - [Kani](https://model-checking.github.io/kani/usage.html)

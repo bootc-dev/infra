@@ -35,10 +35,12 @@ ARG bcvkversion=v0.11.0
 ARG scorecardversion=v5.1.1
 # renovate: datasource=github-releases depName=nushell/nushell
 ARG nushellversion=0.110.0
+# renovate: datasource=github-releases depName=jj-vcs/jj
+ARG jjversion=0.39.0
 # renovate: datasource=github-releases depName=astral-sh/uv
 ARG uvversion=0.10.2
 COPY fetch-tools.sh install-uv.sh /run/src/
-RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion nushellversion=$nushellversion /run/src/fetch-tools.sh
+RUN bcvkversion=$bcvkversion scorecardversion=$scorecardversion nushellversion=$nushellversion jjversion=$jjversion /run/src/fetch-tools.sh
 RUN uvversion=$uvversion /run/src/install-uv.sh
 
 FROM base as rust

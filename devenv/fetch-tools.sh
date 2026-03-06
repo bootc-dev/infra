@@ -7,6 +7,7 @@ set -xeuo pipefail
 : "${bcvkversion:?bcvkversion is required}"
 : "${scorecardversion:?scorecardversion is required}"
 : "${nushellversion:?nushellversion is required}"
+: "${jjversion:?jjversion is required}"
 
 arch=$(arch)
 
@@ -60,5 +61,22 @@ td=$(mktemp -d)
   # The extracted directory has the same name as the archive without .tar.gz
   extracted_dir=nu-${nushellversion}-${nuarch}-unknown-linux-gnu
   mv $extracted_dir/nu /usr/local/bin/nu
+)
+rm -rf $td
+
+# jj (Jujutsu) - next-gen version control
+td=$(mktemp -d)
+(
+  cd $td
+  # Map arch to jj naming convention
+  case "${arch}" in
+    x86_64) jjarch=x86_64 ;;
+    aarch64) jjarch=aarch64 ;;
+    *) echo "jj unavailable for $arch"; exit 0 ;;
+  esac
+  target=jj-v${jjversion}-${jjarch}-unknown-linux-musl.tar.gz
+  /bin/time -f '%E %C' curl -fLO https://github.com/jj-vcs/jj/releases/download/v$jjversion/$target
+  tar xvzf $target
+  mv jj /usr/local/bin/jj
 )
 rm -rf $td
