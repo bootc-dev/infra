@@ -134,6 +134,15 @@
       "groupName": "Docker",
       "enabled": true
     },
+    // bcvk gets its own group so it isn't blocked by the weekly schedule
+    // applied to other Docker group members. Without this, the Docker group
+    // PR can only be created on Sundays (when all deps are in-schedule),
+    // even though bcvk itself is excluded from the weekly schedule above.
+    {
+      "description": ["bcvk updates independently of the Docker group"],
+      "matchPackageNames": ["bootc-dev/bcvk"],
+      "groupName": "bcvk"
+    },
     // Group npm dependencies
     {
       "description": ["npm dependencies"],
