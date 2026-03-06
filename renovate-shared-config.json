@@ -15,6 +15,19 @@
   // referenced in Cargo.toml files. Without initializing submodules, Renovate
   // will fail to analyze these dependencies.
   "cloneSubmodules": true,
+  // Custom datasource for tracking Rust nightly toolchain releases via the
+  // official release manifest. This is the same data source the upcoming
+  // native rust-version datasource (renovatebot/renovate#39529) will use;
+  // once that merges this can be replaced with zero-config native support.
+  "customDatasources": {
+    "rust-nightly": {
+      "defaultRegistryUrlTemplate": "https://static.rust-lang.org/manifests.txt",
+      "format": "plain",
+      "transformTemplates": [
+        "{ \"releases\": $filter(releases, function($r) { $contains($r.version, \"channel-rust-nightly.toml\") }).$merge([{ \"version\": \"nightly-\" & $match(version, /(\\d{4}-\\d{2}-\\d{2})/).groups[0] }]) }"
+      ]
+    }
+  },
   // Custom managers for detecting dependencies in non-standard files
   //
   // - Containerfile/Dockerfile: Match "# renovate:" comments with ARG statements
@@ -24,7 +37,8 @@
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)Containerfile(\\.[^/]*)?$/", "/(^|/)Dockerfile(\\.[^/]*)?$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s+ARG \\w+version=(?<currentValue>.+)"
+        "# renovate: datasource=(?<datasource>[a-z.-]+) depName=(?<depName>[^\\s]+)\\s+ARG \\w+version=(?<currentValue>.+)",
+        "# renovate: datasource=(?<datasource>[a-z.-]+) depName=(?<depName>[^\\s]+) versioning=(?<versioning>[^\\s]+)\\s+ARG \\w+=(?<currentValue>.+)"
       ]
     },
     {
@@ -161,6 +175,11 @@
         "composefs-oci"
       ],
       "enabled": false
+    },
+    // Rust nightly toolchain: use rust-release-channel versioning for nightly-YYYY-MM-DD format
+    {
+      "matchDatasources": ["custom.rust-nightly"],
+      "versioning": "rust-release-channel"
     }
   ]
 }
