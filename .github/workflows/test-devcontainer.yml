@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'devenv/**'
+      - '.devcontainer/**'
       - 'common/.devcontainer/**'
       - '.github/workflows/test-devcontainer.yml'
       - 'Justfile'
