@@ -13,7 +13,7 @@ This repository provides centralized configuration and automation for the
 
 ## Documentation
 
-- [New Repository Setup](docs/SOP-new-repository.md) - Steps for onboarding new repos
+- [Repository Structure](docs/repository-structure.md) - Organization-wide repository standards
 
 ## Renovate
 
