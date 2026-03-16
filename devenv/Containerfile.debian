@@ -11,7 +11,7 @@ set -xeuo pipefail
 echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/99sandbox-disable
 
 # Initialize some basic packages
-apt -y update && apt -y install curl time bzip2
+apt -y update && apt -y install ca-certificates curl time bzip2
 
 # Enable deb-src repositories for build-dep
 sed -i "s/^deb /deb [arch=$(dpkg --print-architecture)] /" /etc/apt/sources.list.d/debian.sources
