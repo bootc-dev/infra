@@ -6,6 +6,10 @@ devcontainer-validate:
 devenv-build-debian:
 	cd devenv && podman build --jobs=4 -f Containerfile.debian -t localhost/bootc-devenv-debian .
 
+# Build devenv Ubuntu 24.04 image with local tag
+devenv-build-ubuntu:
+	cd devenv && podman build --jobs=4 -f Containerfile.ubuntu -t localhost/bootc-devenv-ubuntu .
+
 # Build devenv CentOS Stream 10 image with local tag
 devenv-build-c10s:
 	cd devenv && podman build --jobs=4 -f Containerfile.c10s -t localhost/bootc-devenv-c10s .

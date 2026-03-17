@@ -7,10 +7,12 @@
 !packages-common.txt
 !packages-debian.txt
 !packages-c10s.txt
+!packages-ubuntu.txt
 !npm.txt
 !build-deps.txt
 !build-deps-debian.txt
 !build-deps-c10s.txt
+!build-deps-ubuntu.txt
 !devenv-init.sh
 !fetch-tools.py
 !tool-versions.txt
