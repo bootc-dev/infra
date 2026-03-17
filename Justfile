@@ -1,5 +1,26 @@
-# Validate devcontainer.json syntax
+# Generate per-OS devcontainer.json from the default (debian) template
+devcontainer-generate:
+	#!/bin/bash
+	set -euo pipefail
+	template=common/.devcontainer/devcontainer.json
+	for os in debian ubuntu; do
+	  mkdir -p "common/.devcontainer/${os}"
+	  sed -e "s/devenv-debian/devenv-${os}/g" "$template" > "common/.devcontainer/${os}/devcontainer.json"
+	done
+
+# Validate devcontainer.json syntax and that per-OS configs are in sync
 devcontainer-validate:
+	#!/bin/bash
+	set -euo pipefail
+	template=common/.devcontainer/devcontainer.json
+	for os in debian ubuntu; do
+	  if ! diff -u "common/.devcontainer/${os}/devcontainer.json" <(sed "s/devenv-debian/devenv-${os}/g" "$template"); then
+	    echo "ERROR: common/.devcontainer/${os}/devcontainer.json is out of sync with template"
+	    echo "Run 'just devcontainer-generate' to fix"
+	    exit 1
+	  fi
+	done
+	echo "All devcontainer configs are in sync"
 	npx --yes @devcontainers/cli read-configuration --workspace-folder .
 
 # Build devenv Debian image with local tag

@@ -42,7 +42,6 @@ RUN rust_nightly=$rust_nightly /run/src/install-rust.sh
 FROM rust as kani
 # renovate: datasource=crate depName=kani-verifier
 ARG kaniversion=0.67.0
-RUN dnf install -y gcc && dnf clean all
 COPY install-kani.sh /run/src/
 RUN kaniversion=$kaniversion /run/src/install-kani.sh
 
