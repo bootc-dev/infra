@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [debian]
+        os: [debian, ubuntu]
         # TODO: c10s has PAM/sudo issues with devcontainer CLI's --userns=keep-id
         # include:
         #   - os: c10s

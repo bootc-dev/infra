@@ -1,0 +1,117 @@
+# These aren't packages, just low-dependency binaries dropped in /usr/local/bin
+# so we can fetch them independently in a separate build.
+ARG base=docker.io/library/ubuntu:24.04
+FROM $base AS base
+# Life is too short to care about dash
+RUN ln -sfr /bin/bash /bin/sh
+RUN <<EORUN
+set -xeuo pipefail
+
+# Disable apt sandboxing for nested container environments
+echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/99sandbox-disable
+
+# Initialize some basic packages
+apt -y update && apt -y install ca-certificates curl time bzip2 software-properties-common
+
+# Enable deb-src repositories for build-dep
+sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+
+# Enable universe repository (needed for some packages like just, fsverity)
+add-apt-repository -y universe
+
+# Cherry-pick newer container stack from plucky (Ubuntu 25.04).
+# Keep in sync with actions/bootc-ubuntu-setup.
+# The main archive only carries amd64; arm64 uses ports.ubuntu.com.
+if [ "$(dpkg --print-architecture)" = "amd64" ]; then
+    mirror="http://archive.ubuntu.com/ubuntu"
+else
+    mirror="http://ports.ubuntu.com/ubuntu-ports"
+fi
+echo "deb ${mirror} plucky universe main" > /etc/apt/sources.list.d/plucky.list
+
+# Enable gh CLI repository
+mkdir -p -m 755 /etc/apt/keyrings
+curl -fLo /etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg
+chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+mkdir -p -m 755 /etc/apt/sources.list.d
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
+
+# And re-update after we've fetched repos
+apt -y update
+EORUN
+
+FROM base AS tools
+# renovate: datasource=github-releases depName=astral-sh/uv
+ARG uvversion=0.10.9
+COPY fetch-tools.py tool-versions.txt install-uv.sh /run/src/
+RUN apt -y install python3 && /run/src/fetch-tools.py && apt -y purge python3 && apt -y autoremove
+RUN uvversion=$uvversion /run/src/install-uv.sh
+
+FROM base AS rust
+# renovate: datasource=custom.rust-nightly depName=rust-nightly versioning=rust-release-channel
+ARG rust_nightly=nightly-2026-03-08
+COPY install-rust.sh /run/src/
+RUN rust_nightly=$rust_nightly /run/src/install-rust.sh
+
+# Kani formal verification tool - requires rustup for toolchain management
+FROM rust AS kani
+# renovate: datasource=crate depName=kani-verifier
+ARG kaniversion=0.67.0
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+COPY install-kani.sh /run/src/
+RUN kaniversion=$kaniversion /run/src/install-kani.sh
+
+# This builds the image.
+# Build this using `just devenv-build-ubuntu` from the root of the repository.
+FROM base
+COPY packages-common.txt packages-ubuntu.txt build-deps-ubuntu.txt /run/src/
+WORKDIR /run/src
+RUN <<EORUN
+set -xeuo pipefail
+# Install newer container stack from plucky (keep in sync with actions/bootc-ubuntu-setup)
+# skopeo is currently older in plucky for some reason hence --allow-downgrades
+/bin/time -f '%E %C' apt -y install --allow-downgrades crun/plucky podman/plucky skopeo/plucky just
+grep -hEve '^#' packages-common.txt packages-ubuntu.txt | /bin/time -f '%E %C' xargs apt -y install
+grep -vEe '^#' build-deps-ubuntu.txt | /bin/time -f '%E %C' xargs apt -y build-dep
+apt clean && rm -rf /var/lib/apt/lists/*
+EORUN
+COPY npm.txt /run/src
+RUN grep -vEe '^#' npm.txt | /bin/time -f '%E %C' xargs npm i -g
+
+# Install tmt via uv tool install for isolated environment
+# UV_TOOL_DIR and UV_TOOL_BIN_DIR set to system-wide locations like rustup
+COPY --from=tools /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=tools /usr/local/bin/uvx /usr/local/bin/uvx
+ENV UV_TOOL_DIR=/usr/local/uv-tools
+ENV UV_TOOL_BIN_DIR=/usr/local/bin
+RUN uv tool install 'tmt[provision-virtual]'
+
+# Copy in the binaries from our tools container image
+COPY --from=tools /usr/local/bin/* /usr/local/bin/
+COPY --from=kani /usr/local/bin/* /usr/local/bin/
+COPY --from=kani /usr/local/rustup /usr/local/rustup
+# Kani bundle (compiler, libraries, CBMC) installed via KANI_HOME during setup
+COPY --from=kani /usr/local/kani /usr/local/kani
+# Point rustup at the system-wide installation, but let CARGO_HOME default to ~/.cargo
+ENV RUSTUP_HOME=/usr/local/rustup
+# Point Kani at the system-wide installation
+ENV KANI_HOME=/usr/local/kani
+# Setup for codespaces
+COPY devenv-init.sh /usr/local/bin/
+COPY userns-setup /usr/lib/devenv/userns-setup
+COPY devenv-selftest.sh /usr/libexec/
+RUN chmod 755 /usr/libexec/devenv-selftest.sh /usr/lib/devenv/userns-setup
+
+WORKDIR /
+# Create user before declaring volumes so home directory has correct ownership
+RUN <<EORUN
+set -xeuo pipefail
+useradd -m devenv -s /bin/bash
+# This needs to be precreated and owned by the devenv user
+mkdir -p ~devenv/.local/share/containers
+chown -R -h devenv: ~devenv/.local
+echo 'devenv ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/devenv && chmod 0440 /etc/sudoers.d/devenv
+EORUN
+# To avoid overlay-on-overlay with nested containers
+VOLUME [ "/var/lib/containers", "/home/devenv/.local/share/containers/" ]
+USER devenv
