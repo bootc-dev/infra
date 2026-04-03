@@ -1,0 +1,28 @@
+# Rechunk a bootc base image with chunkah
+#
+# Takes an upstream bootc image (fedora-bootc or centos-bootc), strips
+# the /sysroot (ostree data), and rechunks using chunkah for optimal
+# layer reuse across updates. The result is a "staged" base image
+# suitable for use as a FROM base in bootc development.
+#
+# Usage: just staged-images/build fedora-bootc-44
+
+ARG SOURCE_IMAGE
+ARG CHUNKAH=quay.io/jlebon/chunkah:latest
+ARG MAX_LAYERS=128
+
+FROM ${SOURCE_IMAGE} AS source
+
+FROM ${CHUNKAH} AS chunkah
+ARG MAX_LAYERS
+RUN --mount=type=bind,target=/run/src,rw \
+    --mount=from=source,target=/chunkah,ro \
+      chunkah build \
+        --config /run/src/source-config.json \
+        --prune /sysroot/ \
+        --max-layers "${MAX_LAYERS}" \
+        --label ostree.commit- \
+        --label ostree.final-diffid- \
+        > /run/src/out.ociarchive
+
+FROM oci-archive:out.ociarchive
