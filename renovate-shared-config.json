@@ -57,6 +57,18 @@
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\n\\s*(?:export )?\\w*VERSION=(?<currentValue>v?\\S+)"
       ]
     },
+    // Container image digest pinning in JSON config files
+    // Matches patterns like:
+    //   "_renovate": "datasource=docker depName=quay.io/fedora/fedora-bootc",
+    //   ...
+    //   "source": "quay.io/fedora/fedora-bootc:43@sha256:abc123..."
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["**/sources.json"],
+      "matchStrings": [
+        "\"_renovate\":\\s*\"datasource=(?<datasource>docker) depName=(?<depName>[^\"]+)\"[^}]*\"source\":\\s*\"\\S+:(?<currentValue>[^@\\s\"]+)@(?<currentDigest>sha256:[a-f0-9]+)\""
+      ]
+    },
     // Git refs (commit SHA) tracking in Justfiles and YAML workflows
     // Justfile example:
     //   # renovate: datasource=git-refs depName=https://github.com/org/repo branch=main
@@ -133,6 +145,22 @@
       ],
       "groupName": "Docker",
       "enabled": true
+    },
+    // Group staged bootc base image digest updates separately
+    //
+    // These are the upstream source images for chunkah-staged builds.
+    // Digest updates trigger a rebuild of the staged images, so they
+    // get their own PR. Must come after the Docker group rule so it
+    // takes precedence (Renovate applies all matching rules in order,
+    // later rules win).
+    {
+      "description": ["Staged bootc base image digest updates"],
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": [
+        "quay.io/fedora/fedora-bootc",
+        "quay.io/centos-bootc/centos-bootc"
+      ],
+      "groupName": "staged-images"
     },
     // bcvk gets its own group so it isn't blocked by the weekly schedule
     // applied to other Docker group members. Without this, the Docker group

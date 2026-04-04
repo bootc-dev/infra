@@ -1,0 +1,101 @@
+_sources := justfile_directory() / "sources.json"
+registry := env("REGISTRY", "ghcr.io")
+registry_owner := env("REGISTRY_OWNER", "bootc-dev")
+
+# Look up a field from sources.json by image key (e.g. fedora-bootc-43)
+[private]
+_field image field:
+	@jq -re --arg n "{{image}}" '.[] | select(.name + "-" + .tag == $n) | .{{field}}' "{{_sources}}"
+
+# List available staged images
+list:
+	@jq -r '.[] | .name + "-" + .tag' "{{_sources}}"
+
+# Mirror an upstream source image to our registry.
+# Usage: just staged-images/mirror fedora-bootc-43
+mirror image:
+	#!/bin/bash
+	set -euo pipefail
+	name=$(just {{justfile_directory()}}/_field {{image}} name)
+	tag=$(just {{justfile_directory()}}/_field {{image}} tag)
+	src=$(just {{justfile_directory()}}/_field {{image}} source)
+	dest="{{registry}}/{{registry_owner}}/${name}-source:${tag}"
+	# skopeo doesn't support tag@digest, use digest-only form
+	src_by_digest="${src%%:*}@${src##*@}"
+	echo "Mirroring ${src_by_digest} -> ${dest}"
+	skopeo copy --all --retry-times 3 "docker://${src_by_digest}" "docker://${dest}"
+	echo "Mirrored ${dest}"
+
+# Build a staged image locally.
+# Usage: just staged-images/build fedora-bootc-43
+# Set SOURCE_FROM_MIRROR=1 to pull from registry mirror instead of upstream.
+build image:
+	#!/bin/bash
+	set -euo pipefail
+	name=$(just {{justfile_directory()}}/_field {{image}} name)
+	tag=$(just {{justfile_directory()}}/_field {{image}} tag)
+	src=$(just {{justfile_directory()}}/_field {{image}} source)
+	staged_name="${name}-staged"
+	if [ "${SOURCE_FROM_MIRROR:-}" = "1" ]; then
+	  src="{{registry}}/{{registry_owner}}/${name}-source:${tag}"
+	fi
+	echo "=== Pulling source image ==="
+	podman pull "${src}"
+	echo "=== Writing source config ==="
+	podman inspect "${src}" > "{{justfile_directory()}}/source-config.json"
+	echo "=== Building ${staged_name}:${tag} ==="
+	# -v is needed for buildah < 1.44 (see containers/buildah#5952)
+	buildah build --skip-unused-stages=false \
+	  -v "{{justfile_directory()}}:/run/src" --security-opt=label=disable \
+	  --build-arg SOURCE_IMAGE="${src}" \
+	  --build-arg MAX_LAYERS=128 \
+	  -f "{{justfile_directory()}}/Containerfile" \
+	  -t "localhost/${staged_name}:${tag}" \
+	  "{{justfile_directory()}}"
+	echo "=== Verifying ==="
+	echo "Labels:"
+	podman inspect "localhost/${staged_name}:${tag}" | jq '.[0].Config.Labels'
+	echo "Layer count:"
+	podman inspect "localhost/${staged_name}:${tag}" | jq '.[0].RootFS.Layers | length'
+	echo "Built localhost/${staged_name}:${tag}"
+
+# Build all staged images
+build-all:
+	#!/bin/bash
+	set -euo pipefail
+	for image in $(jq -r '.[] | .name + "-" + .tag' "{{_sources}}"); do
+	  just {{justfile_directory()}}/build "$image"
+	done
+
+# Push a built staged image by digest, print only the digest to stdout.
+# Usage: just staged-images/push fedora-bootc-43 amd64
+push image arch="":
+	#!/bin/bash
+	set -euo pipefail
+	name=$(just {{justfile_directory()}}/_field {{image}} name)
+	tag=$(just {{justfile_directory()}}/_field {{image}} tag)
+	staged_name="${name}-staged"
+	arch="{{arch}}"
+	if [ -z "$arch" ]; then
+	  arch=$(podman info --format '{{{{.Host.Arch}}')
+	fi
+	dest="{{registry}}/{{registry_owner}}/${staged_name}"
+	# Use a per-arch tag to avoid collisions when pushing in parallel
+	push_tag="${tag}-${arch}"
+	podman tag "localhost/${staged_name}:${tag}" "${dest}:${push_tag}" >&2
+	digestfile=$(mktemp)
+	podman push --retry 3 --digestfile "${digestfile}" "${dest}:${push_tag}" >&2
+	digest=$(cat "${digestfile}")
+	rm -f "${digestfile}"
+	echo "${digest}"
+
+# Generate GHA matrices from sources.json (used by CI workflow)
+[private]
+ci-matrix:
+	@jq -c '[.[] | . as $img | {name: ($img.name + "-staged"), tag: $img.tag, image_key: ($img.name + "-" + $img.tag), arch: "amd64", runner: "ubuntu-24.04"}, {name: ($img.name + "-staged"), tag: $img.tag, image_key: ($img.name + "-" + $img.tag), arch: "arm64", runner: "ubuntu-24.04-arm"}] | {include: .}' "{{_sources}}"
+[private]
+ci-mirror-matrix:
+	@jq -c '[.[] | {name: .name, tag: .tag, source: .source, mirror_name: (.name + "-source")}] | {include: .}' "{{_sources}}"
+[private]
+ci-manifest-matrix:
+	@jq -c '[.[] | {name: (.name + "-staged"), tag: .tag}] | {include: .}' "{{_sources}}"

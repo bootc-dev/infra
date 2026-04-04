@@ -1,0 +1,123 @@
+name: Build chunkah-staged bootc base images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'staged-images/**'
+      - '.github/workflows/build-staged-images.yml'
+  schedule:
+    # Rebuild weekly to pick up upstream base image updates
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # Read sources.json and generate matrices for downstream jobs.
+  generate-matrix:
+    name: Generate matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      mirror: ${{ steps.matrix.outputs.mirror }}
+      build: ${{ steps.matrix.outputs.build }}
+      manifest: ${{ steps.matrix.outputs.manifest }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: extractions/setup-just@v3
+      - id: matrix
+        run: |
+          echo "mirror=$(just staged-images/ci-mirror-matrix)" >> "$GITHUB_OUTPUT"
+          echo "build=$(just staged-images/ci-matrix)" >> "$GITHUB_OUTPUT"
+          echo "manifest=$(just staged-images/ci-manifest-matrix)" >> "$GITHUB_OUTPUT"
+
+  # Mirror upstream source images to GHCR so we have our own copy.
+  # Upstream registries (quay.io) may delete old manifests, breaking
+  # digest-pinned pulls.
+  mirror:
+    name: Mirror ${{ matrix.name }}:${{ matrix.tag }}
+    needs: generate-matrix
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.mirror) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: bootc-dev/actions/bootc-ubuntu-setup@main
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            podman login -u "${{ github.actor }}" --password-stdin ${{ env.REGISTRY }}
+      - name: Mirror image
+        run: just staged-images/mirror ${{ matrix.name }}-${{ matrix.tag }}
+        env:
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+
+  build:
+    name: Build ${{ matrix.name }}:${{ matrix.tag }} (${{ matrix.arch }})
+    needs: [generate-matrix, mirror]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.build) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: bootc-dev/actions/bootc-ubuntu-setup@main
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            podman login -u "${{ github.actor }}" --password-stdin ${{ env.REGISTRY }}
+      - name: Build staged image
+        run: just staged-images/build ${{ matrix.image_key }}
+        env:
+          SOURCE_FROM_MIRROR: "1"
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+      - name: Push by digest
+        id: push
+        run: |
+          digest=$(just staged-images/push ${{ matrix.image_key }} ${{ matrix.arch }})
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+        env:
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+      - name: Upload digest artifact
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          echo "${{ steps.push.outputs.digest }}" > "${{ runner.temp }}/digests/${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: staged-digests-${{ matrix.name }}-${{ matrix.tag }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  manifest:
+    name: Manifest ${{ matrix.name }}:${{ matrix.tag }}
+    needs: [generate-matrix, build]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.manifest) }}
+    steps:
+      - uses: bootc-dev/actions/bootc-ubuntu-setup@main
+      - uses: bootc-dev/actions/create-manifest@main
+        with:
+          image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}:${{ matrix.tag }}
+          artifact-pattern: staged-digests-${{ matrix.name }}-${{ matrix.tag }}-*
+          registry-login-env: 'false'
