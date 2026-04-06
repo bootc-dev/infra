@@ -6,6 +6,11 @@ on:
     paths:
       - 'staged-images/**'
       - '.github/workflows/build-staged-images.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'staged-images/**'
+      - '.github/workflows/build-staged-images.yml'
   schedule:
     # Rebuild weekly to pick up upstream base image updates
     - cron: '0 6 * * 1'
@@ -18,6 +23,9 @@ concurrency:
 env:
   REGISTRY: ghcr.io
 
+# Job flow:
+#   PR:                 generate-matrix → build + test
+#   push/schedule:      generate-matrix → mirror → build + test → push → manifest
 jobs:
   # Read sources.json and generate matrices for downstream jobs.
   generate-matrix:
@@ -42,6 +50,7 @@ jobs:
   mirror:
     name: Mirror ${{ matrix.name }}:${{ matrix.tag }}
     needs: generate-matrix
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -75,16 +84,28 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: bootc-dev/actions/bootc-ubuntu-setup@main
+        with:
+          libvirt: ${{ matrix.arch == 'amd64' }}
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
             podman login -u "${{ github.actor }}" --password-stdin ${{ env.REGISTRY }}
       - name: Build staged image
         run: just staged-images/build ${{ matrix.image_key }}
         env:
-          SOURCE_FROM_MIRROR: "1"
+          SOURCE_FROM_MIRROR: ${{ github.event_name != 'pull_request' && '1' || '' }}
           REGISTRY_OWNER: ${{ github.repository_owner }}
+      # Smoke-test: boot the image in a VM and verify all systemd services
+      # started successfully. This catches images broken by rechunking.
+      # Only amd64 — GitHub arm64 runners lack /dev/kvm (no nested KVM).
+      - name: Boot and test staged image
+        if: matrix.arch == 'amd64'
+        run: |
+          image="localhost/${{ matrix.name }}:${{ matrix.tag }}"
+          bcvk ephemeral run-ssh "${image}" -- systemctl is-system-running
       - name: Push by digest
+        if: github.event_name != 'pull_request'
         id: push
         run: |
           digest=$(just staged-images/push ${{ matrix.image_key }} ${{ matrix.arch }})
@@ -92,10 +113,12 @@ jobs:
         env:
           REGISTRY_OWNER: ${{ github.repository_owner }}
       - name: Upload digest artifact
+        if: github.event_name != 'pull_request'
         run: |
           mkdir -p "${{ runner.temp }}/digests"
           echo "${{ steps.push.outputs.digest }}" > "${{ runner.temp }}/digests/${{ matrix.arch }}"
       - uses: actions/upload-artifact@v7
+        if: github.event_name != 'pull_request'
         with:
           name: staged-digests-${{ matrix.name }}-${{ matrix.tag }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
@@ -105,7 +128,7 @@ jobs:
   manifest:
     name: Manifest ${{ matrix.name }}:${{ matrix.tag }}
     needs: [generate-matrix, build]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
