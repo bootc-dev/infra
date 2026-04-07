@@ -186,20 +186,23 @@
       ],
       "pinDigests": false
     },
-    // Disable Fedora OCI updates
+    // Disable Fedora OCI tag updates
     //
-    // This is due to there not being an easy way to tell Renovate which
-    // Fedora version is "stable" and which has not been released yet.
+    // Renovate can't distinguish stable vs unreleased Fedora versions,
+    // so we disable tag bumps. Digest-only updates are still allowed
+    // via the separate rule below.
     {
-      "description": ["Disable Fedora OCI updates"],
+      "description": ["Disable Fedora OCI tag updates (can't distinguish stable vs unreleased)"],
       "matchManagers": [
         "dockerfile",
-        "github-actions"
+        "github-actions",
+        "custom.regex"
       ],
       "matchDepNames": [
         "quay.io/fedora/fedora",
         "quay.io/fedora/fedora-bootc"
       ],
+      "matchUpdateTypes": ["major", "minor", "patch"],
       "enabled": false
     },
     // Ignore bootc cargo dependencies to fix failing Renovate task

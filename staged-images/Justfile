@@ -2,14 +2,15 @@ _sources := justfile_directory() / "sources.json"
 registry := env("REGISTRY", "ghcr.io")
 registry_owner := env("REGISTRY_OWNER", "bootc-dev")
 
-# Look up a field from sources.json by image key (e.g. fedora-bootc-43)
+# Look up a field from sources.json by image key (e.g. fedora-bootc-43).
+# Errors if the key matches zero or more than one entry.
 [private]
 _field image field:
-	@jq -re --arg n "{{image}}" '.[] | select(.name + "-" + .tag == $n) | .{{field}}' "{{_sources}}"
+	@jq -re --arg n "{{image}}" '[.[] | select(.name + "-" + .tag == $n)] | if length != 1 then error("expected exactly 1 match for \($n), got \(length)") else .[0].{{field}} end' "{{_sources}}"
 
 # List available staged images
 list:
-	@jq -r '.[] | .name + "-" + .tag' "{{_sources}}"
+	@jq -r '[.[] | .name + "-" + .tag] | unique | .[]' "{{_sources}}"
 
 # Mirror an upstream source image to our registry.
 # Usage: just staged-images/mirror fedora-bootc-43
@@ -63,7 +64,7 @@ build image:
 build-all:
 	#!/bin/bash
 	set -euo pipefail
-	for image in $(jq -r '.[] | .name + "-" + .tag' "{{_sources}}"); do
+	for image in $(jq -r '[.[] | .name + "-" + .tag] | unique | .[]' "{{_sources}}"); do
 	  just {{justfile_directory()}}/build "$image"
 	done
 
@@ -92,10 +93,10 @@ push image arch="":
 # Generate GHA matrices from sources.json (used by CI workflow)
 [private]
 ci-matrix:
-	@jq -c '[.[] | . as $img | {name: ($img.name + "-staged"), tag: $img.tag, image_key: ($img.name + "-" + $img.tag), arch: "amd64", runner: "ubuntu-24.04"}, {name: ($img.name + "-staged"), tag: $img.tag, image_key: ($img.name + "-" + $img.tag), arch: "arm64", runner: "ubuntu-24.04-arm"}] | {include: .}' "{{_sources}}"
+	@jq -c '[.[] | . as $img | {name: ($img.name + "-staged"), tag: $img.tag, image_key: ($img.name + "-" + $img.tag), arch: "amd64", runner: "ubuntu-24.04"}, {name: ($img.name + "-staged"), tag: $img.tag, image_key: ($img.name + "-" + $img.tag), arch: "arm64", runner: "ubuntu-24.04-arm"}] | unique_by([.name, .tag, .arch]) | {include: .}' "{{_sources}}"
 [private]
 ci-mirror-matrix:
-	@jq -c '[.[] | {name: .name, tag: .tag, source: .source, mirror_name: (.name + "-source")}] | {include: .}' "{{_sources}}"
+	@jq -c '[.[] | {name: .name, tag: .tag, source: .source, mirror_name: (.name + "-source")}] | unique_by([.name, .tag]) | {include: .}' "{{_sources}}"
 [private]
 ci-manifest-matrix:
-	@jq -c '[.[] | {name: (.name + "-staged"), tag: .tag}] | {include: .}' "{{_sources}}"
+	@jq -c '[.[] | {name: (.name + "-staged"), tag: .tag}] | unique_by([.name, .tag]) | {include: .}' "{{_sources}}"
