@@ -214,6 +214,13 @@
       ],
       "enabled": false
     },
+    // nextest-rs/nextest is a monorepo with multiple crates released under
+    // different tag prefixes (cargo-nextest-*, nextest-runner-*, etc.).
+    // Extract only the cargo-nextest version from matching tags.
+    {
+      "matchPackageNames": ["nextest-rs/nextest"],
+      "extractVersion": "^cargo-nextest-(?<version>.*)$"
+    },
     // Rust nightly toolchain: use rust-release-channel versioning for nightly-YYYY-MM-DD format
     {
       "matchDatasources": ["custom.rust-nightly"],
