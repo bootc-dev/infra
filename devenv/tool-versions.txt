@@ -7,7 +7,7 @@ bcvk@v0.13.0
 # renovate: datasource=github-releases depName=ossf/scorecard
 scorecard@v5.4.0
 # renovate: datasource=github-releases depName=nushell/nushell
-nushell@0.111.0
+nushell@0.112.1
 # renovate: datasource=github-releases depName=jj-vcs/jj
 jj@0.40.0
 # renovate: datasource=github-releases depName=nextest-rs/nextest
