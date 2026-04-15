@@ -1,0 +1,8 @@
+# Cargo tools installed via install-cargo-tools.sh
+# Format: crate@version (one per line)
+# Renovate annotations allow automated version updates.
+
+# renovate: datasource=crate depName=cargo-vendor-filterer
+cargo-vendor-filterer@0.5.18
+# renovate: datasource=crate depName=cargo-edit
+cargo-edit@0.13.9

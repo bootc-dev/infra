@@ -19,5 +19,7 @@
 !install-rust.sh
 !install-uv.sh
 !install-kani.sh
+!install-cargo-tools.py
+!cargo-tools.txt
 !devenv-selftest.sh
 !userns-setup
