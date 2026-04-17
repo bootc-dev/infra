@@ -6,12 +6,6 @@
     "source": "quay.io/fedora/fedora-bootc:45@sha256:92faaef45bbfe2d24761a1ddacc277a85916d45365360e638a2b60802b40429b"
   },
   {
-    "_renovate": "datasource=docker depName=quay.io/fedora/fedora-bootc",
-    "name": "fedora-bootc",
-    "tag": "45",
-    "source": "quay.io/fedora/fedora-bootc:45@sha256:92faaef45bbfe2d24761a1ddacc277a85916d45365360e638a2b60802b40429b"
-  },
-  {
     "_renovate": "datasource=docker depName=quay.io/centos-bootc/centos-bootc",
     "name": "centos-bootc",
     "tag": "stream9",

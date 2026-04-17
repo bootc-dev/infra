@@ -8,7 +8,7 @@
 # Usage: just staged-images/build fedora-bootc-44
 
 ARG SOURCE_IMAGE
-ARG CHUNKAH=quay.io/jlebon/chunkah:latest
+ARG CHUNKAH=quay.io/coreos/chunkah:latest
 ARG MAX_LAYERS=128
 
 FROM ${SOURCE_IMAGE} AS source
