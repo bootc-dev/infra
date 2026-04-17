@@ -13,6 +13,7 @@ organization, especially bootc.
 - [bcvk](https://github.com/bootc-dev/bcvk/) to launch bootc VMs
 - [tmt](https://tmt.readthedocs.io/) since bootc testing requires it
 - [Kani](https://model-checking.github.io/kani/usage.html)
+- [Goose](https://github.com/block/goose) AI coding agent
 
 ## Base images
 

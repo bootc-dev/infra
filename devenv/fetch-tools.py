@@ -72,6 +72,22 @@ TOOLS: dict[str, Tool] = {
         binary_path_fmt="jj",
         binary_name="jj",
     ),
+    "cargo-nextest": Tool(
+        repo="nextest-rs/nextest",
+        arch_map={"x86_64": "x86_64", "aarch64": "aarch64"},
+        tag_fmt="cargo-nextest-{version}",
+        tarball_fmt="cargo-nextest-{version}-{arch}-unknown-linux-gnu.tar.gz",
+        binary_path_fmt="cargo-nextest",
+        binary_name="cargo-nextest",
+    ),
+    "goose": Tool(
+        repo="block/goose",
+        arch_map={"x86_64": "x86_64", "aarch64": "aarch64"},
+        tag_fmt="{version}",  # version already includes 'v' prefix
+        tarball_fmt="goose-{arch}-unknown-linux-gnu.tar.gz",
+        binary_path_fmt="goose",
+        binary_name="goose",
+    ),
 }
 
 
