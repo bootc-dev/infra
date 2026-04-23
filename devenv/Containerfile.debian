@@ -78,6 +78,9 @@ COPY --from=kani /usr/local/rustup /usr/local/rustup
 COPY --from=kani /usr/local/kani /usr/local/kani
 # Point rustup at the system-wide installation, but let CARGO_HOME default to ~/.cargo
 ENV RUSTUP_HOME=/usr/local/rustup
+# Simple cargo-installable tools (cargo-vendor-filterer, cargo-edit, etc.)
+COPY cargo-tools.txt install-cargo-tools.py /run/src/
+RUN /run/src/install-cargo-tools.py
 # Point Kani at the system-wide installation
 ENV KANI_HOME=/usr/local/kani
 # Setup for codespaces
