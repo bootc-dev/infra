@@ -1,6 +1,6 @@
 # These aren't packages, just low-dependency binaries dropped in /usr/local/bin
 # so we can fetch them independently in a separate build.
-ARG base=docker.io/library/ubuntu:24.04
+ARG base=docker.io/library/ubuntu:26.04
 FROM $base AS base
 # Life is too short to care about dash
 RUN ln -sfr /bin/bash /bin/sh
@@ -49,7 +49,7 @@ RUN uvversion=$uvversion /run/src/install-uv.sh
 
 FROM base AS rust
 # renovate: datasource=custom.rust-nightly depName=rust-nightly versioning=rust-release-channel
-ARG rust_nightly=nightly-2026-04-19
+ARG rust_nightly=nightly-2026-04-26
 COPY install-rust.sh /run/src/
 RUN rust_nightly=$rust_nightly /run/src/install-rust.sh
 
