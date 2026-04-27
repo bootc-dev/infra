@@ -8,6 +8,7 @@ libvirt-devel
 ostree-devel
 
 # Runtime virt
+qemu-kvm
 xorriso
 qemu-img
 libvirt-daemon-kvm

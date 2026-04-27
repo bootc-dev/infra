@@ -71,6 +71,11 @@ set -xeuo pipefail
 # skopeo is currently older in plucky for some reason hence --allow-downgrades
 /bin/time -f '%E %C' apt -y install --allow-downgrades crun/plucky podman/plucky skopeo/plucky just
 grep -hEve '^#' packages-common.txt packages-ubuntu.txt | /bin/time -f '%E %C' xargs apt -y install
+# qemu-kvm is a virtual package on Ubuntu 26.04 with multiple providers; select by arch
+case $(dpkg --print-architecture) in
+  amd64) apt -y install qemu-system-x86 ;;
+  arm64) apt -y install qemu-system-arm ;;
+esac
 grep -vEe '^#' build-deps-ubuntu.txt | /bin/time -f '%E %C' xargs apt -y build-dep
 apt clean && rm -rf /var/lib/apt/lists/*
 EORUN
