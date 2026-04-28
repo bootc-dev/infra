@@ -26,7 +26,6 @@ pkg-config
 go-md2man
 
 # Runtime virt (common packages)
-qemu-kvm
 virtiofsd
 
 # TUI editors

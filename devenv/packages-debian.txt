@@ -11,6 +11,7 @@ libostree-dev
 python3-dev
 
 # Runtime virt
+qemu-kvm
 genisoimage
 qemu-utils
 libvirt-daemon-system
