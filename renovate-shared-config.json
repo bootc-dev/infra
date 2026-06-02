@@ -136,6 +136,20 @@
       "groupName": "Rust",
       "enabled": true
     },
+    // Restore cargo's default rangeStrategy for in-range updates.
+    //
+    // ":preserveSemverRanges" sets rangeStrategy=replace globally, which means
+    // Renovate only acts when a new version falls *outside* the existing range.
+    // For cargo deps like `tar = "0.4.43"` (i.e. ^0.4.43), patch releases such
+    // as 0.4.46 are in-range and would be silently ignored - Cargo.lock never
+    // gets updated. Restoring `update-lockfile` here makes Renovate bump
+    // Cargo.lock for in-range updates while still using `replace` for
+    // out-of-range ones (the same as cargo's native default behaviour).
+    {
+      "description": ["Restore update-lockfile rangeStrategy for cargo (overrides :preserveSemverRanges)"],
+      "matchManagers": ["cargo"],
+      "rangeStrategy": "update-lockfile"
+    },
     // Group Docker dependencies
     {
       "description": ["Docker dependencies"],
