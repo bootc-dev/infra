@@ -9,8 +9,8 @@ scorecard@v5.5.0
 # renovate: datasource=github-releases depName=nushell/nushell
 nushell@0.113.1
 # renovate: datasource=github-releases depName=jj-vcs/jj
-jj@0.41.0
+jj@0.42.0
 # renovate: datasource=github-releases depName=nextest-rs/nextest
 cargo-nextest@0.9.137
 # renovate: datasource=github-releases depName=block/goose
-goose@v1.36.0
+goose@v1.37.0
