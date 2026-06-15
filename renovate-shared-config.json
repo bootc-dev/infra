@@ -225,7 +225,7 @@
       "matchManagers": ["cargo"],
       "matchPackageNames": [
         "composefs",
-        "cfsctl",
+        "composefs-ctl",
         "composefs-boot",
         "composefs-oci"
       ],
