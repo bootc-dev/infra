@@ -1,4 +1,6 @@
 # CI Infrastructure
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbootc-dev%2Finfra.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbootc-dev%2Finfra?ref=badge_shield)
+
 
 This repository provides centralized configuration and automation for the
 [bootc-dev](https://github.com/bootc-dev) organization.
@@ -47,3 +49,6 @@ with optional debug logging.
 ## License
 
 MIT OR Apache-2.0
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbootc-dev%2Finfra.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbootc-dev%2Finfra?ref=badge_large)
