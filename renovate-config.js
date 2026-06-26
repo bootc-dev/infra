@@ -2,11 +2,17 @@ module.exports = {
   // Find all repositories the GitHub App token has permissions to
   autodiscover: true,
 
-  // Don't create the onboarding PRs
+  // Open onboarding PRs on repos that don't yet have a Renovate config,
+  // proposing the standard config that extends the shared org-wide preset.
   //
-  // All repositories in the organisation will inherit the shared configuration
-  // (./renovate-shared-config.json) by default unless they opt-out.
-  onboarding: false,
+  // The onboarding branch is set explicitly because branchPrefix does not
+  // apply to onboarding PRs.
+  onboarding: true,
+  onboardingBranch: 'bootc-renovate/configure',
+  onboardingConfig: {
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": ["local>bootc-dev/infra:renovate-shared-config.json"],
+  },
 
   // Centralise all Renovate configuration into this repository
   //
