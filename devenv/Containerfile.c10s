@@ -53,6 +53,14 @@ WORKDIR /run/src
 RUN <<EORUN
 set -xeuo pipefail
 grep -hEve '^#' packages-common.txt packages-c10s.txt | /bin/time -f '%E %C' xargs dnf -y install
+
+# This is basically https://bugzilla.redhat.com/show_bug.cgi?id=2494016
+# gpgme2-devel is coming from epel and has the higher NEVRA
+# We want gpgme-devel from cbs instead, so force swap it.
+# This can go away once gpgme in c10s contains:
+# https://src.fedoraproject.org/rpms/gpgme/c/71a426999f6114bfbb666085828ba75bc9ddc6e9
+dnf swap -y gpgme2-devel gpgme-devel
+
 grep -vEe '^#' build-deps-c10s.txt | /bin/time -f '%E %C' xargs dnf -y builddep
 dnf clean all
 # Restore file capabilities for newuidmap/newgidmap - these are defined in the
