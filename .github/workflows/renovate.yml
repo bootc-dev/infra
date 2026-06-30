@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate Renovate config with schema validator
         run: |
@@ -49,10 +49,10 @@ jobs:
           owner: ${{ matrix.owner }}
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Self-hosted Renovate
-        uses: renovatebot/github-action@v46.1.15
+        uses: renovatebot/github-action@v46.1.17
         env:
           RENOVATE_DRY_RUN: ${{ github.repository_owner != 'bootc-dev' && 'full' }}
           LOG_LEVEL: ${{ github.event.inputs.log-level || 'info' }}
