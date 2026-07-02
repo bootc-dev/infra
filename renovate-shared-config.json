@@ -128,12 +128,17 @@
       "enabled": true
     },
     // Group Rust dependencies
+    //
+    // separateMultipleMajor splits each semver-breaking bump into its own PR
+    // so they can be reviewed/landed independently. Cargo versioning treats
+    // 0.x -> 0.y as major, so this covers both pre-1.0 and post-1.0 crates.
     {
       "description": ["Rust dependencies"],
       "matchManagers": [
         "cargo"
       ],
       "groupName": "Rust",
+      "separateMultipleMajor": true,
       "enabled": true
     },
     // Restore cargo's default rangeStrategy for in-range updates.
