@@ -1,6 +1,21 @@
 use anyhow::{Context, Result};
+use clap::Parser;
 use std::path::{Path, PathBuf};
 use xshell::{cmd, Shell};
+
+#[derive(Parser)]
+#[command(about = "Sync common files from infra to target repositories")]
+struct Args {
+    /// Path to the infra repository
+    infra_path: PathBuf,
+    /// Path to the target repository
+    target_path: PathBuf,
+    /// Git commit SHA to mark as synced
+    current_commit: String,
+    /// Patterns to exclude from syncing (passed to rsync --exclude)
+    #[arg(long)]
+    exclude: Vec<String>,
+}
 
 const COMMIT_MARKER: &str = ".bootc-dev-infra-commit.txt";
 
@@ -84,16 +99,25 @@ impl FileOps {
     }
 
     /// Sync directory using rsync
-    fn sync_directory(sh: &Shell, source: &Path, target: &Path) -> Result<()> {
+    fn sync_directory(sh: &Shell, source: &Path, target: &Path, excludes: &[String]) -> Result<()> {
         let source_str = format!("{}/", source.display());
         let target_str = target.display().to_string();
 
-        cmd!(sh, "rsync -av {source_str} {target_str}")
+        let mut rsync_args = vec!["-av".to_string()];
+        for pattern in excludes {
+            rsync_args.push("--exclude".to_string());
+            rsync_args.push(pattern.clone());
+        }
+        rsync_args.push(source_str);
+        rsync_args.push(target_str);
+
+        cmd!(sh, "rsync {rsync_args...}")
             .run()
             .context("Failed to sync directory with rsync")?;
 
         Ok(())
     }
+
 }
 
 /// Main syncer that orchestrates the sync process
@@ -105,6 +129,7 @@ impl CommonFileSyncer {
         infra_path: &Path,
         target_path: &Path,
         current_commit: &str,
+        excludes: &[String],
     ) -> Result<bool> {
         let common_path = infra_path.join("common");
         if !common_path.exists() {
@@ -120,8 +145,9 @@ impl CommonFileSyncer {
                 &common_path,
                 &prev,
                 current_commit,
+                excludes,
             ),
-            None => Self::sync_initial(target_path, &common_path, current_commit),
+            None => Self::sync_initial(target_path, &common_path, current_commit, excludes),
         }
     }
 
@@ -132,6 +158,7 @@ impl CommonFileSyncer {
         common_path: &Path,
         previous_commit: &str,
         current_commit: &str,
+        excludes: &[String],
     ) -> Result<bool> {
         println!("Previous sync: {}", previous_commit);
         println!("Current commit: {}", current_commit);
@@ -160,7 +187,7 @@ impl CommonFileSyncer {
         }
 
         // Sync all current files
-        FileOps::sync_directory(&sh, common_path, target_path)?;
+        FileOps::sync_directory(&sh, common_path, target_path, excludes)?;
 
         // Update commit marker
         FileOps::write_commit_marker(target_path, current_commit)?;
@@ -173,11 +200,12 @@ impl CommonFileSyncer {
         target_path: &Path,
         common_path: &Path,
         current_commit: &str,
+        excludes: &[String],
     ) -> Result<bool> {
         println!("First sync - copying all files");
 
         let sh = Shell::new()?;
-        FileOps::sync_directory(&sh, common_path, target_path)?;
+        FileOps::sync_directory(&sh, common_path, target_path, excludes)?;
         FileOps::write_commit_marker(target_path, current_commit)?;
 
         Ok(true)
@@ -185,18 +213,14 @@ impl CommonFileSyncer {
 }
 
 fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
+    let args = Args::parse();
 
-    if args.len() != 4 {
-        eprintln!("Usage: {} <infra-path> <target-path> <current-commit>", args[0]);
-        std::process::exit(1);
-    }
-
-    let infra_path = PathBuf::from(&args[1]);
-    let target_path = PathBuf::from(&args[2]);
-    let current_commit = &args[3];
-
-    CommonFileSyncer::sync(&infra_path, &target_path, current_commit)?;
+    CommonFileSyncer::sync(
+        &args.infra_path,
+        &args.target_path,
+        &args.current_commit,
+        &args.exclude,
+    )?;
 
     Ok(())
 }
@@ -262,6 +286,7 @@ mod tests {
             infra_dir.path(),
             target_dir.path(),
             "abc123",
+            &[],
         );
 
         assert!(result.is_err());
@@ -304,6 +329,7 @@ mod tests {
             infra_dir.path(),
             target_dir.path(),
             &commit,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -330,7 +356,7 @@ mod tests {
         let initial_commit = setup_infra_repo(infra_dir.path());
 
         // Initial sync
-        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &initial_commit).unwrap();
+        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &initial_commit, &[]).unwrap();
 
         // Add a new file to common/
         let sh = Shell::new().unwrap();
@@ -348,6 +374,7 @@ mod tests {
             infra_dir.path(),
             target_dir.path(),
             &new_commit,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -369,7 +396,7 @@ mod tests {
         let initial_commit = setup_infra_repo(infra_dir.path());
 
         // Initial sync
-        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &initial_commit).unwrap();
+        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &initial_commit, &[]).unwrap();
 
         // Verify file2.txt exists
         assert!(target_dir.path().join("file2.txt").exists());
@@ -389,6 +416,7 @@ mod tests {
             infra_dir.path(),
             target_dir.path(),
             &new_commit,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -408,13 +436,14 @@ mod tests {
         let commit = setup_infra_repo(infra_dir.path());
 
         // Initial sync
-        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &commit).unwrap();
+        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &commit, &[]).unwrap();
 
         // Sync again with same commit (no changes)
         let result = CommonFileSyncer::sync(
             infra_dir.path(),
             target_dir.path(),
             &commit,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -432,7 +461,7 @@ mod tests {
         fs::write(target_dir.path().join("repo-specific.txt"), "local content").unwrap();
 
         // Initial sync
-        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &initial_commit).unwrap();
+        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &initial_commit, &[]).unwrap();
 
         // Verify repo-specific file still exists
         assert!(target_dir.path().join("repo-specific.txt").exists());
@@ -445,4 +474,5 @@ mod tests {
         assert!(target_dir.path().join("file1.txt").exists());
         assert!(target_dir.path().join("file2.txt").exists());
     }
+
 }
