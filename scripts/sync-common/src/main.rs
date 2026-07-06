@@ -475,4 +475,29 @@ mod tests {
         assert!(target_dir.path().join("file2.txt").exists());
     }
 
+    #[test]
+    fn test_initial_sync_with_exclusions() {
+        let infra_dir = TempDir::new().unwrap();
+        let target_dir = TempDir::new().unwrap();
+
+        let commit = setup_infra_repo(infra_dir.path());
+
+        let excluded = infra_dir.path().join("common/excluded");
+        fs::create_dir(&excluded).unwrap();
+        fs::write(excluded.join("skip.txt"), "should be excluded").unwrap();
+
+        let sh = Shell::new().unwrap();
+        let _d = sh.push_dir(infra_dir.path());
+        cmd!(sh, "git add .").run().unwrap();
+        cmd!(sh, "git commit -m 'Add excluded dir'").run().unwrap();
+        let commit = cmd!(sh, "git rev-parse HEAD").read().unwrap().trim().to_string();
+
+        let excludes = vec!["excluded/".to_string()];
+        CommonFileSyncer::sync(infra_dir.path(), target_dir.path(), &commit, &excludes).unwrap();
+
+        assert!(!target_dir.path().join("excluded").exists());
+        assert!(target_dir.path().join("file1.txt").exists());
+        assert!(target_dir.path().join("file2.txt").exists());
+    }
+
 }
