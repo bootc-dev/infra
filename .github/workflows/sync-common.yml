@@ -110,10 +110,22 @@ jobs:
           name: sync-common
           path: .
 
+      - name: Determine exclusions
+        id: exclusions
+        run: |
+          case "${{ matrix.full_name }}" in
+            bootc-dev/bink|bootc-dev/bootc-operator)
+              echo "args=--exclude .devcontainer/" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "args=" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
       - name: Sync common files to repository
         run: |
           chmod +x sync-common
-          ./sync-common infra repo "${{ github.sha }}"
+          ./sync-common infra repo "${{ github.sha }}" ${{ steps.exclusions.outputs.args }}
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v8
