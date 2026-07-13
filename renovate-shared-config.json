@@ -141,6 +141,35 @@
       "separateMultipleMajor": true,
       "enabled": true
     },
+    // Treat git-ref Cargo dependencies the same as major version bumps: give
+    // each one its own PR instead of bundling into the weekly grouped
+    // "Rust" PR above.
+    //
+    // Deps pinned via `git = "...", rev = "<sha>"` (e.g. bootc-mount in
+    // bcvk) have no semver, so Renovate can't classify an upstream change
+    // as major/minor/patch - it always reports these as "digest" updates,
+    // which would otherwise get silently folded into the routine "Rust"
+    // update, even though a git-ref bump can carry arbitrary breaking
+    // changes just like a major version bump. `groupName: null` clears the
+    // groupName set by the "Rust" rule above, so each dependency gets its
+    // own individual PR (Renovate's default when a dep isn't grouped) -
+    // note this is stricter isolation than plain major bumps get today,
+    // since those still combine multiple crates needing a major bump into
+    // one shared PR; `separateMultipleMajor` above only splits a *single*
+    // crate's multiple major-version jumps into separate PRs. Must come
+    // after the "Rust" group rule above so this override takes precedence
+    // (Renovate applies matching rules in order, later rules win).
+    //
+    // Note: deps pinned via `branch = "..."` instead of `rev` (e.g.
+    // composefs-run) are skipped by Renovate's cargo manager entirely -
+    // they get no update PRs at all today, regardless of this rule.
+    {
+      "description": ["Treat git-ref Cargo dependency updates the same as major version bumps (own PR per dependency, not bundled into the weekly Rust group)"],
+      "matchManagers": ["cargo"],
+      "matchDatasources": ["git-refs"],
+      "matchUpdateTypes": ["digest"],
+      "groupName": null
+    },
     // Restore cargo's default rangeStrategy for in-range updates.
     //
     // ":preserveSemverRanges" sets rangeStrategy=replace globally, which means
