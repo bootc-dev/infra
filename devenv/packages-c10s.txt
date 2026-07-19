@@ -13,6 +13,9 @@ xorriso
 qemu-img
 libvirt-daemon-kvm
 
+# OSTree CLI (used by ostree integration tests)
+ostree
+
 # Testing framework
 tmt
 

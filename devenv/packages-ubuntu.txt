@@ -15,6 +15,9 @@ genisoimage
 qemu-utils
 libvirt-daemon-system
 
+# OSTree CLI (used by ostree integration tests)
+ostree
+
 # Filesystem verity utilities (composefs testing)
 fsverity
 
