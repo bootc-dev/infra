@@ -103,7 +103,19 @@ jobs:
         if: matrix.arch == 'amd64'
         run: |
           image="localhost/${{ matrix.name }}:${{ matrix.tag }}"
-          bcvk ephemeral run-ssh "${image}" -- systemctl is-system-running
+          bcvk ephemeral run-ssh "${image}" -- bash -c '
+            state=$(systemctl is-system-running)
+            if [ "$state" != "running" ]; then
+              echo "System state: $state"
+              echo "Failed units:"
+              systemctl list-units --state=failed --no-legend
+              systemctl list-units --state=failed --no-legend --plain | while read -r unit _rest; do
+                echo "--- Status of $unit ---"
+                systemctl status "$unit" --no-pager --full 2>&1 || true
+              done
+              exit 1
+            fi
+          '
       - name: Push by digest
         if: github.event_name != 'pull_request'
         id: push
