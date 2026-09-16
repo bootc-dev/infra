@@ -97,7 +97,8 @@
       "description": ["Limit dependency updates to weekly (Sundays UTC) to reduce PR churn. bcvk is excluded and updates immediately."],
       "matchPackageNames": ["!bootc-dev/bcvk"],
       "schedule": ["on sunday"],
-      "timezone": "UTC"
+      "timezone": "UTC",
+      "updateNotScheduled": false
     },
     {
     // These files in these repos are synced from the bootc-dev/infra repository, which
