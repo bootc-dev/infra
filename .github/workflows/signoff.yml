@@ -10,7 +10,7 @@ jobs:
     if: |
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/signoff')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -80,11 +80,13 @@ jobs:
           set -euo pipefail
 
           # Get PR details
-          PR_DATA=$(gh pr view "$ISSUE_NUMBER" --repo "$REPO" --json headRefName,headRefOid)
+          PR_DATA=$(gh pr view "$ISSUE_NUMBER" --repo "$REPO" --json headRefName,headRefOid,baseRefName)
           BRANCH=$(echo "$PR_DATA" | jq -r '.headRefName')
           EXPECTED_SHA=$(echo "$PR_DATA" | jq -r '.headRefOid')
+          BASE_BRANCH=$(echo "$PR_DATA" | jq -r '.baseRefName')
 
           echo "Branch: $BRANCH"
+          echo "Base branch: $BASE_BRANCH"
           echo "Expected SHA: $EXPECTED_SHA"
 
           # Checkout the PR branch
@@ -113,26 +115,21 @@ jobs:
 
           echo "Signing off as: $COMMENTER_NAME <$COMMENTER_EMAIL>"
 
-          # Get current commit message
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-
-          # Check if signoff already exists
+          # Check if all commits already have the signoff
           SIGNOFF_LINE="Signed-off-by: $COMMENTER_NAME <$COMMENTER_EMAIL>"
-          if echo "$COMMIT_MSG" | grep -qF "$SIGNOFF_LINE"; then
+          UNSIGNED_COMMITS=$(git log "origin/$BASE_BRANCH..HEAD" --grep="$SIGNOFF_LINE" --invert-grep --oneline | wc -l)
+
+          if [ "$UNSIGNED_COMMITS" -eq 0 ]; then
             echo "already_signed=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Amend the commit with signoff
+          # Configure git identity
           git config user.name "$COMMENTER_NAME"
           git config user.email "$COMMENTER_EMAIL"
 
-          # Add signoff to commit message
-          NEW_COMMIT_MSG="${COMMIT_MSG}
-
-          $SIGNOFF_LINE"
-
-          git commit --amend -m "$NEW_COMMIT_MSG"
+          # Use git rebase --signoff to add signoff to all commits
+          git rebase --signoff "origin/$BASE_BRANCH"
 
           # Force push
           git push --force-with-lease origin "$BRANCH"
@@ -167,7 +164,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           gh pr comment "$ISSUE_NUMBER" --repo "$REPO" --body \
-            "✅ This commit is already signed off by you."
+            "✅ All commits are already signed off by you."
 
       - name: Post success message
         if: |
@@ -179,4 +176,4 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           gh pr comment "$ISSUE_NUMBER" --repo "$REPO" --body \
-            "✅ DCO signoff added successfully."
+            "✅ DCO signoff added to all commits successfully."
