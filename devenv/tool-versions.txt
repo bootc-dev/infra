@@ -11,6 +11,6 @@ nushell@0.115.1
 # renovate: datasource=github-releases depName=jj-vcs/jj
 jj@0.45.1
 # renovate: datasource=github-releases depName=nextest-rs/nextest
-cargo-nextest@0.9.144
+cargo-nextest@0.9.145
 # renovate: datasource=github-releases depName=block/goose
-goose@v1.50.1
+goose@v1.51.0
