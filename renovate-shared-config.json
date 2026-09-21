@@ -100,6 +100,19 @@
       "timezone": "UTC",
       "updateNotScheduled": false
     },
+    // Ignore gh-aw (GitHub Agentic Workflows) managed files
+    //
+    // gh-aw workflow files (.github/workflows/*.md and *.lock.yml) are managed
+    // by the gh-aw compiler. The lock files contain pinned action and container
+    // versions that Renovate would normally update, but any such changes would be
+    // overwritten on the next compile. Ignore these files to prevent conflicts.
+    {
+      "description": ["Ignore gh-aw managed workflow files"],
+      "ignorePaths": [
+        ".github/workflows/*.md",
+        ".github/workflows/*.lock.yml"
+      ]
+    },
     {
     // These files in these repos are synced from the bootc-dev/infra repository, which
     // sends PRs to update them. Ignoring them here to avoid conflicting Renovate updates.
