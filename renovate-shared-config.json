@@ -108,6 +108,7 @@
     // overwritten on the next compile. Ignore these files to prevent conflicts.
     {
       "description": ["Ignore gh-aw managed workflow files"],
+      "matchFileNames": ["**/*"],
       "ignorePaths": [
         ".github/workflows/*.md",
         ".github/workflows/*.lock.yml"
