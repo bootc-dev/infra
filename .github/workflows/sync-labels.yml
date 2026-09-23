@@ -22,7 +22,7 @@ permissions:
 jobs:
   init:
     name: Discover repositories
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       matrix: ${{ steps.discover.outputs.matrix }}
       labels: ${{ steps.parse-labels.outputs.labels }}
@@ -79,7 +79,7 @@ jobs:
     name: Sync to ${{ matrix.full_name }}
     needs: init
     if: needs.init.outputs.matrix != '[]'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
