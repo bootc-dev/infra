@@ -30,7 +30,7 @@ jobs:
   # Read sources.json and generate matrices for downstream jobs.
   generate-matrix:
     name: Generate matrix
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       mirror: ${{ steps.matrix.outputs.mirror }}
       build: ${{ steps.matrix.outputs.build }}
@@ -51,7 +51,7 @@ jobs:
     name: Mirror ${{ matrix.name }}:${{ matrix.tag }}
     needs: generate-matrix
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
@@ -141,7 +141,7 @@ jobs:
     name: Manifest ${{ matrix.name }}:${{ matrix.tag }}
     needs: [generate-matrix, build]
     if: ${{ !cancelled() && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
