@@ -1,0 +1,116 @@
+name: Override Check
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  override:
+    # Only run on PR comments that start with /override
+    if: |
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/override ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: write
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Parse override command
+        id: parse
+        run: |
+          set -euo pipefail
+          comment_body="${{ github.event.comment.body }}"
+          # Extract check name from "/override <checkname>"
+          if [[ "$comment_body" =~ ^/override[[:space:]]+([^[:space:]]+) ]]; then
+            check_name="${BASH_REMATCH[1]}"
+            echo "check_name=$check_name" >> "$GITHUB_OUTPUT"
+            echo "Parsed check name: $check_name"
+          else
+            echo "::error::Invalid /override command format. Use: /override <checkname>"
+            exit 1
+          fi
+
+      - name: Check user permissions
+        id: check_perms
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          user="${{ github.event.comment.user.login }}"
+
+          # Check if user has write or admin permission
+          permission=$(gh api "repos/$repo/collaborators/$user/permission" --jq .permission)
+
+          echo "User $user has permission: $permission"
+
+          if [[ "$permission" == "write" || "$permission" == "admin" ]]; then
+            echo "has_write_access=true" >> "$GITHUB_OUTPUT"
+            echo "User has sufficient permissions"
+          else
+            echo "has_write_access=false" >> "$GITHUB_OUTPUT"
+            echo "::error::User $user does not have write access to override checks"
+            exit 1
+          fi
+
+      - name: Get PR head SHA
+        id: pr_info
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pr_number="${{ github.event.issue.number }}"
+          repo="${{ github.repository }}"
+
+          head_sha=$(gh pr view "$pr_number" --repo "$repo" --json headRefOid --jq .headRefOid)
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "PR head SHA: $head_sha"
+
+      - name: Create success check run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          check_name="${{ steps.parse.outputs.check_name }}"
+          head_sha="${{ steps.pr_info.outputs.head_sha }}"
+          user="${{ github.event.comment.user.login }}"
+
+          # Create a check run with success status
+          gh api "repos/$repo/check-runs" \
+            -X POST \
+            -f name="$check_name" \
+            -f head_sha="$head_sha" \
+            -f status=completed \
+            -f conclusion=success \
+            -f output[title]="Override: $check_name" \
+            -f output[summary]="Check overridden by @$user via /override command"
+
+      - name: Add reaction to comment
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          comment_id="${{ github.event.comment.id }}"
+          repo="${{ github.repository }}"
+
+          # Add thumbs up reaction to indicate success
+          gh api "repos/$repo/issues/comments/$comment_id/reactions" \
+            -X POST \
+            -f content='+1'
+
+      - name: Add error reaction
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          comment_id="${{ github.event.comment.id }}"
+          repo="${{ github.repository }}"
+
+          # Add confused reaction to indicate failure
+          gh api "repos/$repo/issues/comments/$comment_id/reactions" \
+            -X POST \
+            -f content='confused' || true
