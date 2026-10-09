@@ -22,7 +22,7 @@ automatically inherit the shared configuration from `renovate-shared-config.json
 
 Key features of the shared config:
 - Signed-off commits for all dependency updates
-- Grouped updates by ecosystem (GitHub Actions, Rust, Docker, npm)
+- Grouped updates by ecosystem (GitHub Actions, Go, Rust, Docker, npm)
 - Custom regex managers for Containerfiles and version files
 - Disabled digest pinning for container images
 
