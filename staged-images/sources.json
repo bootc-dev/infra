@@ -9,12 +9,12 @@
     "_renovate": "datasource=docker depName=quay.io/centos-bootc/centos-bootc",
     "name": "centos-bootc",
     "tag": "stream9",
-    "source": "quay.io/centos-bootc/centos-bootc:stream9@sha256:7211a13fc383ee15ec51b328779d045f2cd97567ee92b5f6ae81fb28abdaeb08"
+    "source": "quay.io/centos-bootc/centos-bootc:stream9@sha256:c3cdaf690807f101fc26207a35fb9fa5871620cb450d02b89041e2189be4a33b"
   },
   {
     "_renovate": "datasource=docker depName=quay.io/centos-bootc/centos-bootc",
     "name": "centos-bootc",
     "tag": "stream10",
-    "source": "quay.io/centos-bootc/centos-bootc:stream10@sha256:354c25a933e3bf16c113dec79740f03cee850db68d3b14ad3a66345f2256f6b3"
+    "source": "quay.io/centos-bootc/centos-bootc:stream10@sha256:fe31b7a45259893485cfb37f3648e7da70140b16dcc5b06f493f69f11c19e04d"
   }
 ]
