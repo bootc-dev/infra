@@ -3,7 +3,7 @@
 # Renovate annotations allow automated version updates.
 
 # renovate: datasource=github-releases depName=bootc-dev/bcvk
-bcvk@v0.21.0
+bcvk@v0.22.0
 # renovate: datasource=github-releases depName=ossf/scorecard
 scorecard@v5.6.0
 # renovate: datasource=github-releases depName=nushell/nushell
