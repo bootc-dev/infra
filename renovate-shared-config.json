@@ -128,11 +128,23 @@
       "groupName": "GitHub Actions",
       "enabled": true
     },
-    // Group Go module dependencies
+    // Group direct Go updates separately from indirect updates. Go version,
+    // toolchain, and replacement updates also remain in this group.
     {
-      "description": ["Go dependencies"],
+      "description": ["Direct Go dependencies and module directives"],
       "matchManagers": ["gomod"],
-      "groupName": "Go",
+      "groupName": "Go direct",
+      "constraintsFiltering": "strict",
+      "postUpdateOptions": ["gomodTidy"]
+    },
+    // Keep independent indirect updates visible for review without letting a
+    // broken transitive upgrade block direct updates in the same grouped PR.
+    // See https://github.com/bootc-dev/bootc-operator/pull/280.
+    {
+      "description": ["Group indirect Go dependencies separately"],
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "groupName": "Go indirect",
       "enabled": true
     },
     // Group Rust dependencies
