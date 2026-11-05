@@ -1,0 +1,43 @@
+name: Rebase Helper
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR needs rebase
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const needsRebase = pr.mergeable_state === 'dirty';
+
+            const labels = pr.labels.map(label => label.name);
+            const hasLabel = labels.includes('needs-rebase');
+
+            if (needsRebase && !hasLabel) {
+              console.log('PR needs rebase, adding label');
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['needs-rebase']
+              });
+            } else if (!needsRebase && hasLabel) {
+              console.log('PR no longer needs rebase, removing label');
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                name: 'needs-rebase'
+              });
+            } else {
+              console.log('No label changes needed');
+            }
