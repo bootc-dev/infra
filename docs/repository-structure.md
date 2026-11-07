@@ -40,6 +40,12 @@ The ["required-checks" pattern](https://github.com/bootc-dev/bootc/blob/main/.gi
 is where the repository configuration gates solely on that check which in turn gates on others, allowing easy dynamic
 reconfiguration of the required checks without requiring administrator intervention.
 
+## Releases
+
+The proposed organization-wide draft release PR flow and research into
+immutable GitHub releases are in [automatic-releases.md](automatic-releases.md).
+This is a proposal, not an enabled workflow.
+
 ## Language
 
 In this organization, Rust is preferred.
