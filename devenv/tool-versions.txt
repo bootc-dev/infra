@@ -5,7 +5,7 @@
 # renovate: datasource=github-releases depName=bootc-dev/bcvk
 bcvk@v0.22.0
 # renovate: datasource=github-releases depName=ossf/scorecard
-scorecard@v5.6.0
+scorecard@v5.7.0
 # renovate: datasource=github-releases depName=nushell/nushell
 nushell@0.117.0
 # renovate: datasource=github-releases depName=jj-vcs/jj
@@ -13,4 +13,4 @@ jj@0.47.1
 # renovate: datasource=github-releases depName=nextest-rs/nextest
 cargo-nextest@0.9.152
 # renovate: datasource=github-releases depName=block/goose
-goose@v1.59.1
+goose@v1.60.2
